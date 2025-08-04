@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/continuedev/continue/main/website/static/schema.json",
+  "models": [
+    {
+      "title": "Qwen3-8B (Agent via LM Studio)",
+      "provider": "openai",
+      "apiKey": "not-needed",
+      "apiBase": "http://localhost:1234/v1",
+      "model": "qwen3:8b",
+      "completionOptions": {
+        "temperature": 0.2,
+        "max_tokens": 2048
+      },
+      "agent": {
+        "type": "default"
+      }
+    }
+  ]
+}

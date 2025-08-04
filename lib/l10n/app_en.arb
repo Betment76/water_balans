@@ -1,0 +1,47 @@
+{
+  "appTitle": "Water Balance",
+  "homeTitle": "Home",
+  "statsTitle": "Statistics",
+  "settingsTitle": "Settings",
+  "profileTitle": "Profile",
+  "addWater": "Add Water",
+  "currentWaterStats": "{current}/{target} ml",
+  "@currentWaterStats": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "target": {
+        "type": "int"
+      }
+    }
+  },
+  "temperatureLabel": "Temperature: {temp}°C",
+  "@temperatureLabel": {
+    "placeholders": {
+      "temp": {
+        "type": "double"
+      }
+    }
+  },
+  "loadingWeather": "Loading weather...",
+  "weatherError": "Weather loading error",
+  "noWeatherData": "No weather data",
+  "refreshWeather": "Refresh weather",
+  "last7days": "Last 7 days",
+  "averageLabel": "Average",
+  "streakLabel": "Streak",
+  "settingsSaved": "Settings saved, notifications updated",
+  "weight": "Weight (kg)",
+  "weightError": "Enter weight from 30 to 200",
+  "height": "Height (cm, optional)",
+  "heightError": "Height from 100 to 250",
+  "activityLevel": "Activity level",
+  "activityLow": "Low",
+  "activityMedium": "Medium",
+  "activityHigh": "High",
+  "weatherEnabled": "Consider weather",
+  "save": "Save",
+  "mlUnit": "ml",
+  "daysUnit": "days"
+}

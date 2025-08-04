@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/continuedev/continue/main/website/static/schema.json",
+  "models": [
+    {
+      "title": "Ollama Qwen",
+      "provider": "ollama",
+      "model": "qwen3:8b",
+      "apiBase": "http://localhost:11434"
+    }
+  ],
+  "context": {
+    "files": ["lib/", "main.dart", "pubspec.yaml"],
+    "exclude": ["**/build/**", "**/.dart_tool/**", "**/.git/**"],
+    "maxFiles": 100,
+    "maxTokens": 8000
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "appTitle": "Водный баланс",
+  "homeTitle": "Главная",
+  "statsTitle": "Статистика",
+  "settingsTitle": "Персонализация",
+  "profileTitle": "Профиль",
+  "addWater": "Добавить воду",
+  "currentWaterStats": "{current}/{target} мл",
+  "@currentWaterStats": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "target": {
+        "type": "int"
+      }
+    }
+  },
+  "temperatureLabel": "Температура: {temp}°C",
+  "@temperatureLabel": {
+    "placeholders": {
+      "temp": {
+        "type": "double"
+      }
+    }
+  },
+  "loadingWeather": "Загрузка погоды...",
+  "weatherError": "Ошибка загрузки погоды",
+  "noWeatherData": "Нет данных о погоде",
+  "refreshWeather": "Обновить погоду",
+  "last7days": "Последние 7 дней",
+  "averageLabel": "Среднее",
+  "streakLabel": "Серия",
+  "settingsSaved": "Настройки сохранены, уведомления обновлены",
+  "weight": "Вес (кг)",
+  "weightError": "Введите вес от 30 до 200",
+  "height": "Рост (см, опционально)",
+  "heightError": "Рост от 100 до 250",
+  "activityLevel": "Уровень активности",
+  "activityLow": "Низкий",
+  "activityMedium": "Средний",
+  "activityHigh": "Высокий",
+  "weatherEnabled": "Учитывать погоду",
+  "save": "Сохранить",
+  "mlUnit": "мл",
+  "daysUnit": "дней"
+}
