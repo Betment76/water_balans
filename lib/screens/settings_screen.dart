@@ -6,6 +6,7 @@ import '../providers/user_settings_provider.dart';
 import '../services/weather_service.dart';
 import '../services/notification_service.dart';
 import '../constants/app_colors.dart';
+import 'about_screen.dart';
 
 /// Экран настроек пользователя
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -392,23 +393,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           
           const SizedBox(height: 24),
           
-          // Pro функции
-          _buildProSection(),
+                     // Pro функции (будут добавлены в следующих версиях)
+           // _buildProSection(),
           
           const SizedBox(height: 24),
           
-          // Опасная зона
-          _buildSection(
-            title: 'Опасная зона',
-            children: [
-              ListTile(
-                leading: const Icon(Icons.delete_forever, color: Colors.red),
-                title: const Text('Сбросить все данные'),
-                subtitle: const Text('Удалить все настройки и историю'),
-                onTap: _resetData,
-              ),
-            ],
-          ),
+                     // О приложении
+           _buildSection(
+             title: 'О приложении',
+             children: [
+               ListTile(
+                 leading: const Icon(Icons.info, color: kBlue),
+                 title: const Text('О приложении'),
+                 subtitle: const Text('Версия, разработчик, контакты'),
+                 onTap: () => Navigator.push(
+                   context,
+                   MaterialPageRoute(builder: (context) => const AboutScreen()),
+                 ),
+               ),
+             ],
+           ),
+           
+           // Опасная зона
+           _buildSection(
+             title: 'Опасная зона',
+             children: [
+               ListTile(
+                 leading: const Icon(Icons.delete_forever, color: Colors.red),
+                 title: const Text('Сбросить все данные'),
+                 subtitle: const Text('Удалить все настройки и историю'),
+                 onTap: _resetData,
+               ),
+             ],
+           ),
           
           const SizedBox(height: 32),
           
@@ -447,7 +464,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  /// Секция Pro функций
+  /// Секция Pro функций (будут добавлены в следующих версиях)
+  /*
   Widget _buildProSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -635,7 +653,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  /// Покупка Pro версии
+  /// Покупка Pro версии (будет добавлена в следующих версиях)
+  /*
   Future<void> _purchasePro() async {
     try {
       // TODO: Интеграция с платежной системой RuStore
@@ -668,7 +687,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  /// Восстановление покупки
+  /// Восстановление покупки (будет добавлено в следующих версиях)
+  /*
   Future<void> _restorePurchase() async {
     try {
       // TODO: Проверка покупки через RuStore
@@ -709,6 +729,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     }
   }
+  */
 }
 
 const Color kBlue = Color(0xFF1976D2);

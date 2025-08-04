@@ -1,5 +1,5 @@
 name: water_balance
-description: "A new Flutter project."
+description: "Приложение для отслеживания потребления воды с интерактивным интерфейсом"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -45,6 +45,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.2 # Уже добавлено, но уточняем что для локализации
+  url_launcher: ^6.2.5 # Для открытия ссылок и email
 
 dev_dependencies:
   flutter_test:
