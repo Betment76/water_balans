@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/user_settings_provider.dart';
 import '../services/weather_service.dart';
 import '../services/notification_service.dart';
+import '../services/calculation_service.dart';
 import '../constants/app_colors.dart';
 import 'about_screen.dart';
 
@@ -27,7 +28,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   String? _weightError;
   String? _heightError;
-  String? _dailyNormError;
   double? _temperature;
   bool _isLoadingWeather = false;
   String? _weatherError;
@@ -38,6 +38,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _loadSettings();
     _checkProStatus();
     _fetchWeather();
+
+    weightController.addListener(_updateDailyNorm);
+  }
+
+  void _updateDailyNorm() {
+    final weight = int.tryParse(weightController.text);
+    if (weight != null && weight > 0) {
+      final norm = CalculationService.calculateDailyNorm(
+        weight: weight,
+        activityLevel: activityLevel,
+      );
+      dailyNormController.text = norm.toString();
+    }
   }
 
   /// Загрузить настройки из хранилища
@@ -46,9 +59,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (settings != null) {
       weightController.text = settings.weight.toString();
       heightController.text = settings.height?.toString() ?? '';
-             dailyNormController.text = settings.dailyNormML.toString();
-       activityLevel = settings.activityLevel;
-       selectedUnit = settings.unit;
+      dailyNormController.text = settings.dailyNormML.toString();
+      activityLevel = settings.activityLevel;
+      selectedUnit = settings.unit;
     }
   }
 
@@ -65,11 +78,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _weatherError = null;
     });
     // Для примера — город Москва
-    final temp = await WeatherService.fetchTemperatureByCity('Moscow');
+    final weatherData = await WeatherService.fetchWeatherByCity('Moscow');
     setState(() {
       _isLoadingWeather = false;
-      if (temp != null) {
-        _temperature = temp;
+      if (weatherData != null) {
+        _temperature = weatherData.temperature;
       } else {
         _weatherError = 'Ошибка загрузки погоды';
       }
@@ -78,6 +91,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   void dispose() {
+    weightController.removeListener(_updateDailyNorm);
     weightController.dispose();
     heightController.dispose();
     dailyNormController.dispose();
@@ -88,7 +102,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() {
       _weightError = null;
       _heightError = null;
-      _dailyNormError = null;
     });
     
     final weight = int.tryParse(weightController.text);
@@ -103,20 +116,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       setState(() => _heightError = 'Рост от 100 до 250');
       return;
     }
-    if (dailyNorm == null || dailyNorm < 500 || dailyNorm > 5000) {
-      setState(() => _dailyNormError = 'Норма от 500 до 5000 мл');
-      return;
-    }
     
-         final settings = UserSettings(
-       weight: weight,
-       height: height,
-       activityLevel: activityLevel,
-       dailyNormML: dailyNorm,
-       isWeatherEnabled: true,
-       notificationIntervalHours: 2,
-       unit: selectedUnit,
-     );
+    final settings = UserSettings(
+      weight: weight,
+      height: height,
+      activityLevel: activityLevel,
+      dailyNormML: dailyNorm ?? 0, // dailyNorm не может быть null
+      isWeatherEnabled: true,
+      notificationIntervalHours: 2,
+      unit: selectedUnit,
+    );
     
     ref.read(userSettingsProvider.notifier).save(settings);
     NotificationService.scheduleReminders(settings);
@@ -125,8 +134,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       const SnackBar(content: Text('Настройки сохранены')),
     );
   }
-
-
 
   Future<void> _resetData() async {
     final confirmed = await showDialog<bool>(
@@ -222,9 +229,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: TextField(
                       controller: dailyNormController,
                       keyboardType: TextInputType.number,
+                      enabled: false, // Поле нормы нередактируемое
                       decoration: InputDecoration(
                         labelText: 'Норма (мл)',
-                        errorText: _dailyNormError,
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       ),
@@ -250,7 +257,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                      child: Padding(
                        padding: const EdgeInsets.only(right: 4),
                        child: ElevatedButton(
-                         onPressed: () => setState(() => activityLevel = 0),
+                         onPressed: () {
+                           setState(() => activityLevel = 0);
+                           _updateDailyNorm();
+                         },
                          style: ElevatedButton.styleFrom(
                            backgroundColor: activityLevel == 0 ? kBlue : Colors.grey.shade200,
                            foregroundColor: activityLevel == 0 ? Colors.white : Colors.black87,
@@ -267,7 +277,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                      child: Padding(
                        padding: const EdgeInsets.symmetric(horizontal: 4),
                        child: ElevatedButton(
-                         onPressed: () => setState(() => activityLevel = 1),
+                         onPressed: () {
+                           setState(() => activityLevel = 1);
+                           _updateDailyNorm();
+                         },
                          style: ElevatedButton.styleFrom(
                            backgroundColor: activityLevel == 1 ? kBlue : Colors.grey.shade200,
                            foregroundColor: activityLevel == 1 ? Colors.white : Colors.black87,
@@ -284,7 +297,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                      child: Padding(
                        padding: const EdgeInsets.only(left: 4),
                        child: ElevatedButton(
-                         onPressed: () => setState(() => activityLevel = 2),
+                         onPressed: () {
+                           setState(() => activityLevel = 2);
+                           _updateDailyNorm();
+                         },
                          style: ElevatedButton.styleFrom(
                            backgroundColor: activityLevel == 2 ? kBlue : Colors.grey.shade200,
                            foregroundColor: activityLevel == 2 ? Colors.white : Colors.black87,
@@ -368,28 +384,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           
 
           
-                     // Погода
-           _buildSection(
-             title: 'Погода',
-             children: [
-               Row(
-                 children: [
-                   const Icon(Icons.wb_sunny, color: Colors.orange),
-                   const SizedBox(width: 8),
-                   _isLoadingWeather
-                     ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                     : _weatherError != null
-                       ? Text(_weatherError!, style: const TextStyle(color: Colors.red))
-                       : Text(_temperature != null ? 'Температура: ${_temperature!.toStringAsFixed(1)}°C' : 'Нет данных'),
-                   IconButton(
-                     icon: const Icon(Icons.refresh),
-                     tooltip: 'Обновить погоду',
-                     onPressed: _isLoadingWeather ? null : _fetchWeather,
-                   ),
-                 ],
-               ),
-             ],
-           ),
+                     
           
           const SizedBox(height: 24),
           
@@ -398,21 +393,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           
           const SizedBox(height: 24),
           
-                     // О приложении
-           _buildSection(
-             title: 'О приложении',
-             children: [
-               ListTile(
-                 leading: const Icon(Icons.info, color: kBlue),
-                 title: const Text('О приложении'),
-                 subtitle: const Text('Версия, разработчик, контакты'),
-                 onTap: () => Navigator.push(
-                   context,
-                   MaterialPageRoute(builder: (context) => const AboutScreen()),
-                 ),
-               ),
-             ],
-           ),
+                     
            
            // Опасная зона
            _buildSection(
@@ -464,272 +445,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  /// Секция Pro функций (будут добавлены в следующих версиях)
-  /*
-  Widget _buildProSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(Icons.star, color: Colors.amber, size: 24),
-            const SizedBox(width: 8),
-            const Text(
-              'Pro функции',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: kBlue,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        
-        if (_isProUser) ...[
-          // Pro функции для Pro пользователей
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.amber.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.amber.shade200),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.amber,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.verified,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Pro версия активна',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Вам доступны все функции:',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildProFeature('Расширенная статистика'),
-                  _buildProFeature('Кастомные уведомления'),
-                  _buildProFeature('Редактирование истории'),
-                  _buildProFeature('Экспорт данных'),
-                  _buildProFeature('Тёмная тема'),
-                ],
-              ),
-            ),
-          ),
-        ] else ...[
-          // Pro функции для обычных пользователей
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.orange.shade200),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.orange,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.star,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Обновите до Pro',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Получите доступ к расширенным функциям:',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildProFeature('Расширенная статистика'),
-                  _buildProFeature('Кастомные уведомления'),
-                  _buildProFeature('Редактирование истории'),
-                  _buildProFeature('Экспорт данных'),
-                  _buildProFeature('Тёмная тема'),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _purchasePro,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text('Купить Pro'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _restorePurchase,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.orange,
-                            side: const BorderSide(color: Colors.orange),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text('Восстановить'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  /// Отображение Pro функции
-  Widget _buildProFeature(String feature) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Icon(
-            _isProUser ? Icons.check_circle : Icons.lock,
-            color: _isProUser ? Colors.green : Colors.grey,
-            size: 16,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            feature,
-            style: TextStyle(
-              fontSize: 14,
-              color: _isProUser ? Colors.black87 : Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Покупка Pro версии (будет добавлена в следующих версиях)
-  /*
-  Future<void> _purchasePro() async {
-    try {
-      // TODO: Интеграция с платежной системой RuStore
-      // Пока что просто симулируем покупку
-      await Future.delayed(const Duration(seconds: 2));
-      
-      await StorageService.setProUser(true);
-      
-      setState(() {
-        _isProUser = true;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pro версия активирована!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка покупки: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  /// Восстановление покупки (будет добавлено в следующих версиях)
-  /*
-  Future<void> _restorePurchase() async {
-    try {
-      // TODO: Проверка покупки через RuStore
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Симулируем восстановление
-      final isPro = await StorageService.isProUser();
-      
-      setState(() {
-        _isProUser = isPro;
-      });
-
-      if (mounted) {
-        if (isPro) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Pro версия восстановлена!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Pro покупка не найдена'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка восстановления: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-  */
 }
 
 const Color kBlue = Color(0xFF1976D2);

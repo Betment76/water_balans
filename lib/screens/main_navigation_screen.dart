@@ -3,6 +3,7 @@ import 'home_screen.dart';
 
 import 'history_screen.dart';
 import 'reminders_screen.dart';
+import 'about_screen.dart';
 
 import 'settings_screen.dart';
 
@@ -26,6 +27,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const HistoryScreen(),
     const RemindersScreen(),
     const SettingsScreen(),
+    const AboutScreen(),
   ];
 
   @override
@@ -57,6 +59,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               icon: Icons.settings,
               selected: _currentIndex == 3,
               onTap: () => setState(() => _currentIndex = 3),
+            ),
+            _NavIcon(
+              icon: Icons.info_outline,
+              selected: _currentIndex == 4,
+              onTap: () => setState(() => _currentIndex = 4),
             ),
           ],
         ),

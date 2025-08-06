@@ -1,7 +1,11 @@
 
 
+import 'package:sensors_plus/sensors_plus.dart';
+
 /// Сервис для расчёта дневной нормы воды
 class CalculationService {
+  static Stream<int>? _activityStream;
+
   /// Рассчитать дневную норму воды (мл)
   /// Формула: (вес * 30 мл) + активность (0-500 мл) + погода (0-300 мл)
   static int calculateDailyNorm({
@@ -22,5 +26,20 @@ class CalculationService {
     // Расчёт по формуле
     int activityML = [0, 250, 500][activityLevel];
     return (weight * 30) + activityML + weatherAddition;
+  }
+
+  /// Поток с дополнительным количеством воды в зависимости от активности
+  static Stream<int> get activityBasedAddition {
+    _activityStream ??= accelerometerEvents
+        .map((event) {
+          // Простая логика: если ускорение по любой оси > 10, считаем за активность
+          if (event.x.abs() > 15 || event.y.abs() > 15 || event.z.abs() > 15) {
+            return 50; // Добавляем 50 мл за всплеск активности
+          }
+          return 0;
+        })
+        .where((event) => event > 0) // Фильтруем, чтобы не было лишних событий
+        .asBroadcastStream(); // Делаем поток широковещательным
+    return _activityStream!;
   }
 } 

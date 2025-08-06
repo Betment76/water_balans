@@ -18,7 +18,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   List<WaterIntake> _waterIntakes = [];
   bool _isLoading = true;
-  bool _isProUser = false;
+  // bool _isProUser = false; // Удалено: переменная _isProUser больше не нужна
   DateTime _selectedDate = DateTime.now();
 
   @override
@@ -33,7 +33,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     });
 
     try {
-      final isPro = await StorageService.isProUser();
+      // final isPro = await StorageService.isProUser(); // Удалено: загрузка Pro-статуса больше не нужна
       final intakes = await StorageService.getWaterIntakesForDate(_selectedDate);
       
       print('Загружено записей для ${_selectedDate}: ${intakes.length}');
@@ -42,7 +42,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       }
       
       setState(() {
-        _isProUser = isPro;
+        // _isProUser = isPro; // Удалено: _isProUser больше не используется
         _waterIntakes = intakes;
         _isLoading = false;
       });
@@ -76,10 +76,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   Future<void> _editIntake(WaterIntake intake) async {
-    if (!_isProUser) {
-      _showProUpgradeDialog();
-      return;
-    }
+    // if (!_isProUser) { // Удалено: проверка Pro-статуса больше не нужна
+    //   _showProUpgradeDialog(); // Удалено: вызов диалога Pro-версии больше не нужен
+    //   return;
+    // }
 
     final TextEditingController amountController = TextEditingController(
       text: intake.volumeML.toString(),
@@ -151,10 +151,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   Future<void> _deleteIntake(WaterIntake intake) async {
-    if (!_isProUser) {
-      _showProUpgradeDialog();
-      return;
-    }
+    // if (!_isProUser) { // Удалено: проверка Pro-статуса больше не нужна
+    //   _showProUpgradeDialog(); // Удалено: вызов диалога Pro-версии больше не нужен
+    //   return;
+    // }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -195,30 +195,30 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     }
   }
 
-  void _showProUpgradeDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Pro функция'),
-        content: const Text(
-          'Редактирование и удаление записей доступно только в Pro версии.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // TODO: Открыть экран Pro
-            },
-            child: const Text('Обновить до Pro'),
-          ),
-        ],
-      ),
-    );
-  }
+  // void _showProUpgradeDialog() { // Удалено: метод _showProUpgradeDialog больше не нужен
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('Pro функция'),
+  //       content: const Text(
+  //         'Редактирование и удаление записей доступно только в Pro версии.',
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.of(context).pop(),
+  //           child: const Text('Отмена'),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () {
+  //             Navigator.of(context).pop();
+  //             // TODO: Открыть экран Pro
+  //           },
+  //           child: const Text('Обновить до Pro'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -251,10 +251,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
     return Column(
       children: [
-                 // Заголовок с датой и общим количеством
-         Container(
-           padding: const EdgeInsets.all(16),
-           color: Colors.transparent, // Изменено с kLightBlue.withOpacity(0.1)
+        // Заголовок с датой и общим количеством
+        Container(
+          padding: const EdgeInsets.all(16),
+          color: Colors.transparent, // Изменено с kLightBlue.withOpacity(0.1)
           child: Row(
             children: [
               Expanded(
@@ -269,36 +269,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                                         Text(
-                       'Всего: ${totalAmount} мл',
-                       style: const TextStyle(
-                         fontSize: 16,
-                         color: kBlue,
-                         fontWeight: FontWeight.w500,
-                       ),
-                     ),
+                    Text(
+                      'Всего: ${totalAmount} мл',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: kBlue,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              if (!_isProUser)
-                                 Container(
-                   padding: const EdgeInsets.symmetric(
-                     horizontal: 8,
-                     vertical: 4,
-                   ),
-                   decoration: BoxDecoration(
-                     color: kBlue,
-                     borderRadius: BorderRadius.circular(12),
-                   ),
-                   child: const Text(
-                     'FREE',
-                     style: TextStyle(
-                       color: kWhite,
-                       fontSize: 12,
-                       fontWeight: FontWeight.bold,
-                     ),
-                   ),
-                 ),
             ],
           ),
         ),
@@ -352,55 +333,75 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   Widget _buildIntakeItem(WaterIntake intake) {
-    return Card(
-      color: Colors.white, // Set card color to white
-      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.grey[200], // Changed from kLightBlue
-          child: Icon(Icons.water_drop, color: kBlue),
+    return Dismissible(
+      key: ValueKey(intake.id),
+      background: Container(
+        color: kBlue,
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        child: const Row(
+          children: [
+            Icon(Icons.edit, color: kWhite),
+            SizedBox(width: 8),
+            Text('Редактировать', style: TextStyle(color: kWhite)),
+          ],
         ),
-                        title: Text('${intake.volumeML} мл'),
-        subtitle: Text(_formatTime(intake.dateTime)),
-        trailing: _isProUser
-            ? PopupMenuButton<String>(
-                onSelected: (value) {
-                  switch (value) {
-                    case 'edit':
-                      _editIntake(intake);
-                      break;
-                    case 'delete':
-                      _deleteIntake(intake);
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit),
-                        SizedBox(width: 8),
-                        Text('Редактировать'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Удалить', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
-              )
-            : IconButton(
-                icon: const Icon(Icons.star_outline),
-                onPressed: () => _showProUpgradeDialog(),
-              ),
+      ),
+      secondaryBackground: Container(
+        color: Colors.red,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text('Удалить', style: TextStyle(color: kWhite)),
+            SizedBox(width: 8),
+            Icon(Icons.delete, color: kWhite),
+          ],
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.endToStart) {
+          // Свайп влево (удаление)
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Удалить запись'),
+              content: const Text('Вы уверены, что хотите удалить эту запись?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Отмена'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Удалить'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) {
+            await _deleteIntake(intake);
+          }
+          return false; // Не удаляем элемент сразу, т.к. _deleteIntake уже обновит список
+        } else {
+          // Свайп вправо (редактирование)
+          await _editIntake(intake);
+          return false; // Не удаляем элемент
+        }
+      },
+      child: Card(
+        color: Colors.white,
+        margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0), // Карточки сделаны тоньше
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Colors.grey[200],
+            child: const Icon(Icons.water_drop, color: kBlue),
+          ),
+          title: Text('${intake.volumeML} мл'),
+          subtitle: Text(_formatTime(intake.dateTime)),
+        ),
       ),
     );
   }
@@ -424,3 +425,28 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 }
+
+// Удалено: Дублирующийся класс HistoryScreen и _HistoryScreenState
+// class HistoryScreen extends StatefulWidget {
+//   const HistoryScreen({super.key});
+
+//   @override
+//   State<HistoryScreen> createState() => _HistoryScreenState();
+// }
+
+// class _HistoryScreenState extends State<HistoryScreen> {
+//   // bool _isProUser = false; // Переменная для определения Pro-пользователя, закомментирована
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _loadProStatus();
+//   }
+
+//   // Загрузка статуса Pro-пользователя, закомментирована, так как функционал Pro не используется
+//   void _loadProStatus() async {
+//     // final userSettings = Provider.of<UserSettingsProvider>(context, listen: false).userSettings;
+//     // setState(() {
+//     //   _isProUser = userSettings.isProUser;
+//     // });
+//   }

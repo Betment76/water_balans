@@ -99,6 +99,7 @@ class AboutScreen extends StatelessWidget {
   /// Информация о приложении
   Widget _buildAppInfo() {
     return Card(
+      color: const Color(0xFFE3F2FD), // Светло-голубой цвет
       elevation: 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -139,6 +140,7 @@ class AboutScreen extends StatelessWidget {
   /// Информация о разработчике
   Widget _buildDeveloperInfo() {
     return Card(
+      color: const Color(0xFFE3F2FD), // Светло-голубой цвет
       elevation: 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -205,6 +207,7 @@ class AboutScreen extends StatelessWidget {
   /// Контактная информация
   Widget _buildContactInfo() {
     return Card(
+      color: const Color(0xFFE3F2FD), // Светло-голубой цвет
       elevation: 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -252,6 +255,7 @@ class AboutScreen extends StatelessWidget {
   /// Политика конфиденциальности
   Widget _buildPrivacyPolicy() {
     return Card(
+      color: const Color(0xFFE3F2FD), // Светло-голубой цвет
       elevation: 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),

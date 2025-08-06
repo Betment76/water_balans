@@ -1,333 +1,311 @@
-import 'package:flutter/material.dart';
-import 'package:sensors_plus/sensors_plus.dart';
-import 'dart:async';
-import 'dart:math';
-import 'package:water_balance/l10n/app_localizations.dart';
-import '../models/water_intake.dart';
-import '../services/storage_service.dart';
-import '../providers/user_settings_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:water_balance/providers/user_settings_provider.dart';
+import 'package:water_balance/services/storage_service.dart';
+import 'package:water_balance/models/water_intake.dart';
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:water_balance/models/weather_data.dart';
+import 'package:water_balance/services/calculation_service.dart';
+import 'package:water_balance/services/weather_service.dart';
+import 'package:water_balance/widgets/bubble_widget.dart';
+import 'package:water_balance/widgets/fish_widget.dart';
 
-const Color kBlue = Color(0xFF1976D2); // синий для рамок и текста
-const Color kLightBlue = Color(0xFF64B5F6); // голубой для воды
-const Color kWhite = Colors.white; // белый фон
-
-/// Главный экран с прогрессом воды и "живой" водой
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProviderStateMixin {
-  double _tiltAngle = 0.0; // угол наклона по X (в радианах)
-  double _currentWaveAngle = 0.0; // угол волны (инерция)
-  double _waveAmplitude = 0.0; // амплитуда волны
-  double _wavePhase = 0.0; // фаза волны
-  double _lastAngle = 0.0; // для вычисления скорости изменения
-  StreamSubscription<AccelerometerEvent>? _accelSub;
-  late AnimationController _controller;
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  // Плагин для локальных уведомлений
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
-  int _currentWater = 0; // теперь состояние
-  int _dailyGoal = 2000; // будет обновляться из настроек
+  // Общее количество выпитой воды
+  int _waterIntake = 250;
+
+  // Таймер для уведомлений
+  Timer? _notificationTimer;
+  StreamSubscription? _activitySubscription;
+  WeatherData? _weatherData;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 16))
-      ..addListener(_animateWave);
-    _controller.repeat();
-    _accelSub = accelerometerEventStream().listen((event) {
-      // Только по X (наклон влево/вправо)
-      double angle = event.x / 9.8 * (pi / 2);
-      angle = angle.clamp(-pi / 2, pi / 2); // до 90 градусов
-      setState(() {
-        _tiltAngle = angle;
-      });
+    // Инициализация настроек уведомлений
+    _initializeNotifications();
+    // Запуск таймера для проверки необходимости уведомлений
+    _startNotificationTimer();
+    // Подписка на поток активности
+    _activitySubscription = CalculationService.activityBasedAddition.listen((addition) {
+      final settings = ref.read(userSettingsProvider);
+      if (settings != null) {
+        final newGoal = settings.dailyNormML + addition;
+        ref.read(userSettingsProvider.notifier).save(settings.copyWith(dailyNormML: newGoal));
+      }
     });
-    
-    // Загружаем данные о воде за сегодня
-    _loadTodayWater();
-    _loadUserSettings();
-  }
-  
-  Future<void> _loadTodayWater() async {
-    try {
-      final todayIntakes = await StorageService.getWaterIntakesForDate(DateTime.now());
-      final todayTotal = todayIntakes.fold<int>(0, (sum, intake) => sum + intake.volumeML);
-      print('Загружено записей за сегодня: ${todayIntakes.length}, общий объем: $todayTotal мл');
-      setState(() {
-        _currentWater = todayTotal;
-      });
-    } catch (e) {
-      print('Ошибка загрузки данных о воде: $e');
-    }
-  }
-  
-  void _loadUserSettings() {
-    final settings = ref.read(userSettingsProvider);
-    if (settings != null) {
-      setState(() {
-        _dailyGoal = settings.dailyNormML;
-      });
-    }
-  }
-
-  void _animateWave() {
-    // Плавно догоняем целевой угол (эффект инерции)
-    const double inertia = 0.12;
-    _currentWaveAngle += (_tiltAngle - _currentWaveAngle) * inertia;
-
-    // Физика волны: если угол меняется — увеличиваем амплитуду
-    double angleDelta = _tiltAngle - _lastAngle;
-    _lastAngle = _tiltAngle;
-    if (angleDelta.abs() > 0.001) {
-      _waveAmplitude += angleDelta * 2.0;
-      _waveAmplitude = _waveAmplitude.clamp(-0.8, 0.8);
-    }
-    _waveAmplitude *= 0.96;
-    _wavePhase += 0.06;
-    if (_waveAmplitude.abs() < 0.01) _waveAmplitude = 0.0;
-    setState(() {});
-  }
-
-  Future<void> _addWater(int amount) async {
-    setState(() {
-      _currentWater = (_currentWater + amount).clamp(0, _dailyGoal);
-    });
-    
-    // Сохраняем запись о приеме воды
-    final intake = WaterIntake(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      volumeML: amount,
-      dateTime: DateTime.now(),
-    );
-    
-    try {
-      final allIntakes = await StorageService.loadWaterIntakes();
-      allIntakes.add(intake);
-      await StorageService.saveWaterIntakes(allIntakes);
-      print('Запись воды сохранена: ${intake.volumeML} мл');
-      
-      // Обновляем отображение
-      await _loadTodayWater();
-    } catch (e) {
-      print('Ошибка сохранения записи воды: $e');
-    }
+    _fetchWeather();
+    _loadTodaysIntake();
   }
 
   @override
   void dispose() {
-    _accelSub?.cancel();
-    _controller.dispose();
+    // Остановка таймера при уничтожении виджета
+    _notificationTimer?.cancel();
+    _activitySubscription?.cancel();
     super.dispose();
+  }
+
+  // Инициализация плагина уведомлений
+  void _initializeNotifications() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+    // Запрос разрешения на уведомления на Android 13+
+    final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidImplementation != null) {
+      await androidImplementation.requestNotificationsPermission();
+    }
+  }
+
+  // Запуск таймера для отправки уведомлений
+  void _startNotificationTimer() {
+    // Проверяем каждые 5 минут
+    _notificationTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      final waterGoal = ref.read(userSettingsProvider)?.dailyNormML ?? 2000;
+      // Если выпито меньше 80% от цели, отправляем уведомление
+      if ((_waterIntake / waterGoal) < 0.8) {
+        _showNotification();
+      }
+    });
+  }
+
+  // Показать уведомление
+  Future<void> _showNotification() async {
+    // Детали уведомления для Android
+    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+      'water_balance_channel', // ID канала
+      'Напоминания о воде', // Имя канала
+      channelDescription: 'Напоминания, чтобы выпить воды и поддерживать баланс', // Описание канала
+      importance: Importance.max, // Важность уведомления
+      priority: Priority.high, // Приоритет уведомления
+      showWhen: false, // Не показывать временную метку
+      largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'), // Иконка для уведомления
+    );
+
+    // Общие детали уведомления
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+    );
+
+    // Показ уведомления
+    await flutterLocalNotificationsPlugin.show(
+      0, // ID уведомления
+      'Спаси меня!', // Заголовок уведомления
+      'Я умираю от жажды! Срочно выпей воды, иначе я превращусь в сушеную воблу!', // Текст уведомления
+      platformChannelSpecifics, // Детали уведомления
+      payload: 'item x', // Полезная нагрузка
+    );
+  }
+
+  // Функция для добавления выпитой воды
+  void _addWater(int amount) async {
+    setState(() {
+      _waterIntake += amount;
+    });
+
+    final newIntake = WaterIntake(
+      id: DateTime.now().toIso8601String(),
+      volumeML: amount,
+      dateTime: DateTime.now(),
+    );
+
+    final intakes = await StorageService.loadWaterIntakes();
+    intakes.add(newIntake);
+    await StorageService.saveWaterIntakes(intakes);
+  }
+
+  Future<void> _loadTodaysIntake() async {
+    final intakes = await StorageService.getWaterIntakesForDate(DateTime.now());
+    setState(() {
+      _waterIntake = intakes.fold(0, (sum, item) => sum + item.volumeML);
+    });
+  }
+
+  Future<void> _fetchWeather() async {
+    try {
+      LocationPermission permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        // Если нет разрешения, показываем погоду для Москвы
+        final weather = await WeatherService.fetchWeatherByCity('Moscow');
+        setState(() {
+          _weatherData = weather;
+        });
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition();
+      final weather = await WeatherService.fetchWeather(latitude: position.latitude, longitude: position.longitude);
+      setState(() {
+        _weatherData = weather;
+      });
+    } catch (e) {
+      print('Ошибка при получении погоды: $e');
+    }
+  }
+
+  Widget _buildAddWaterButton(int amount) {
+    return ElevatedButton(
+      onPressed: () => _addWater(amount),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+      ),
+      child: Text('$amount мл'),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(userSettingsProvider);
-    if (settings != null && _dailyGoal != settings.dailyNormML) {
-      _dailyGoal = settings.dailyNormML;
-    }
-    
-    final int percent = _dailyGoal > 0 ? ((_currentWater / _dailyGoal) * 100).toInt() : 0;
-    final double percentFill = _dailyGoal > 0 ? (_currentWater / _dailyGoal).clamp(0.0, 1.0) : 0.0;
-    final double ballSize = MediaQuery.of(context).size.height * 0.45;
+    final userSettings = ref.watch(userSettingsProvider);
+    final waterGoal = userSettings?.dailyNormML ?? 2000;
+    // Процент выпитой воды от цели
+    final double percentage = (_waterIntake / waterGoal).clamp(0.0, 1.0);
 
     return Scaffold(
-      backgroundColor: kWhite,
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.appTitle),
+        leading: _weatherData != null ? _getWeatherIcon(_weatherData!.condition) : null,
+        title: const Text('Водный баланс'),
         centerTitle: true,
-        automaticallyImplyLeading: false,
-        backgroundColor: kBlue,
-        foregroundColor: kWhite,
-        elevation: 0,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(height: 40),
-            // Шар с водой и процентом
-            Center(
-              child: _WaterBall(
-                percent: percent,
-                fill: percentFill,
-                size: ballSize,
-                tiltAngle: _currentWaveAngle,
-                waveAmplitude: _waveAmplitude,
-                wavePhase: _wavePhase,
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Прогресс (текущее/цель)
-            Text(
-              AppLocalizations.of(context)!.currentWaterStats(_currentWater, _dailyGoal),
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kBlue),
-            ),
-            const Spacer(),
-            // Слово "Добавить" над кнопкой
+        actions: [
+          if (_weatherData != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Text(
-                AppLocalizations.of(context)!.addWater,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: kBlue),
+              padding: const EdgeInsets.only(right: 20.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '${_weatherData!.temperature.round()}°C',
+                    style: const TextStyle(fontSize: 20),
+                  ),
+                  if (_weatherData!.city != null)
+                    Text(
+                      _weatherData!.city!,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                ],
               ),
             ),
-            // Ряд быстрых кнопок без контейнера и рамки
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        ],
+      ),
+      body: Center(
+        child: Column(
+          children: <Widget>[
+            const SizedBox(height: 20),
+            // Виджет аквариума
+            _Aquarium(percentage: percentage),
+            const SizedBox(height: 20),
+            // Отображение текущего прогресса
+            Text(
+              '$_waterIntake / $waterGoal мл',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 20),
+            // Кнопки для быстрого добавления воды
+            Wrap(
+              spacing: 12.0,
+              alignment: WrapAlignment.center,
               children: [
-                _QuickAddButton(amount: 200, onPressed: () => _addWater(200)),
-                _QuickAddButton(amount: 250, onPressed: () => _addWater(250)),
-                _QuickAddButton(amount: 500, onPressed: () => _addWater(500)),
-                _QuickAddButton(amount: 1000, onPressed: () => _addWater(1000)),
+                _buildAddWaterButton(50),
+                _buildAddWaterButton(100),
+                _buildAddWaterButton(150),
+                _buildAddWaterButton(200),
+                _buildAddWaterButton(250),
               ],
             ),
-            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
-}
 
-/// Круглый шар с водой и процентом
-class _WaterBall extends StatelessWidget {
-  final int percent;
-  final double fill; // от 0.0 до 1.0
-  final double size;
-  final double tiltAngle; // угол наклона воды
-  final double waveAmplitude; // амплитуда волны
-  final double wavePhase; // фаза волны
-  const _WaterBall({
-    required this.percent,
-    required this.fill,
-    required this.size,
-    required this.tiltAngle,
-    required this.waveAmplitude,
-    required this.wavePhase,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CustomPaint(
-            size: Size(size, size),
-            painter: _WaterBallPainter(fill, tiltAngle, waveAmplitude, wavePhase),
-          ),
-          // Цвет процентов всегда синий с белой тенью
-          Text(
-            '$percent%',
-            style: TextStyle(
-              fontSize: size * 0.28,
-              fontWeight: FontWeight.bold,
-              color: kBlue,
-              shadows: [
-                Shadow(
-                  blurRadius: 12,
-                  color: Colors.white,
-                  offset: Offset(0, 0),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Painter для шара с "живой" водой
-class _WaterBallPainter extends CustomPainter {
-  final double fill; // от 0.0 до 1.0
-  final double tiltAngle; // угол наклона воды
-  final double waveAmplitude; // амплитуда волны
-  final double wavePhase; // фаза волны
-  _WaterBallPainter(this.fill, this.tiltAngle, this.waveAmplitude, this.wavePhase);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double radius = size.width / 2;
-    final Offset center = Offset(radius, radius);
-
-    // Рисуем белый круг (фон)
-    final Paint circlePaint = Paint()
-      ..color = kWhite
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, radius, circlePaint);
-
-    // Рисуем "живую" воду (волнистая поверхность, наклоняется по X)
-    final Paint waterPaint = Paint()
-      ..color = kLightBlue
-      ..style = PaintingStyle.fill;
-    final Path waterPath = Path();
-    final double waterLevel = size.height * (1 - fill);
-    final double baseWaveHeight = size.height * 0.05;
-    final int waveCount = 2;
-    // Волна: если амплитуда почти 0 — ровная поверхность
-    waterPath.moveTo(0, size.height);
-    for (double x = 0; x <= size.width; x += 1) {
-      double edgeAttenuation = 0.5 + 0.5 * cos((x / size.width) * pi); // затухание по краям
-      double wave = 0;
-      if (waveAmplitude.abs() > 0.001) {
-        wave = sin((x / size.width) * pi * waveCount + wavePhase) * baseWaveHeight * waveAmplitude * 1.3 * edgeAttenuation;
-      }
-      double y = waterLevel + tan(tiltAngle) * (x - radius) * 0.25 + wave;
-      waterPath.lineTo(x, y);
+  Widget _getWeatherIcon(String condition) {
+    switch (condition) {
+      case 'Clear':
+        return const Icon(Icons.wb_sunny, color: Colors.orange);
+      case 'Clouds':
+        return const Icon(Icons.wb_cloudy, color: Colors.white);
+      case 'Rain':
+        return const Icon(Icons.beach_access, color: Colors.white);
+      case 'Thunderstorm':
+        return const Icon(Icons.flash_on, color: Colors.yellow);
+      default:
+        return const Icon(Icons.thermostat, color: Colors.white);
     }
-    waterPath.lineTo(size.width, size.height);
-    waterPath.close();
-    // Обрезаем по кругу
-    canvas.save();
-    canvas.clipPath(Path()..addOval(Rect.fromCircle(center: center, radius: radius)));
-    canvas.drawPath(waterPath, waterPaint);
-    canvas.restore();
-
-    // Контур шара
-    final Paint outlinePaint = Paint()
-      ..color = kBlue
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
-    canvas.drawCircle(center, radius, outlinePaint);
   }
-
-  @override
-  bool shouldRepaint(covariant _WaterBallPainter oldDelegate) =>
-      oldDelegate.fill != fill ||
-      oldDelegate.tiltAngle != tiltAngle ||
-      oldDelegate.waveAmplitude != waveAmplitude ||
-      oldDelegate.wavePhase != wavePhase;
 }
 
-/// Быстрая кнопка добавления воды
-class _QuickAddButton extends StatelessWidget {
-  final int amount;
-  final VoidCallback onPressed;
-  const _QuickAddButton({required this.amount, required this.onPressed});
+// Виджет, представляющий аквариум
+class _Aquarium extends StatelessWidget {
+  final double percentage;
+
+  const _Aquarium({required this.percentage});
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: kBlue,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        minimumSize: const Size(0, 40),
-        elevation: 0,
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double aquariumSize = screenWidth * 0.8;
+    final double waterHeight = aquariumSize * percentage;
+    // Размер рыбки теперь зависит от прогресса
+    final double fishSize = 30 + 40 * percentage;
+
+    // Проверяем, достаточно ли воды для плавания
+    final bool isSwimming = waterHeight > fishSize;
+
+    // Позиция рыбки по вертикали
+    // Если не плавает, она на дне. Иначе, плавает в пределах воды.
+    final double fishBottom = isSwimming ? (waterHeight - fishSize) / 2 : 0;
+
+    return Container(
+      width: aquariumSize,
+      height: aquariumSize,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.blue, width: 4),
       ),
-      child: Text('$amount ${AppLocalizations.of(context)!.mlUnit}', style: const TextStyle(fontSize: 16, color: kWhite)),
+      child: ClipOval(
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            // Анимация воды
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              height: waterHeight,
+              color: Colors.lightBlue.withOpacity(0.5),
+            ),
+            // Пузырьки
+            BubblesWidget(waterHeight: waterHeight),
+            // Рыбка
+            Positioned(
+              bottom: fishBottom,
+              child: FishWidget(
+                progress: percentage,
+                isSwimming: isSwimming, // Передаем состояние плавания
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

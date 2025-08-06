@@ -86,42 +86,18 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Заголовок
-            const Text(
-              'Настройка напоминаний',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: kBlue,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Получайте уведомления о питье воды в удобное время',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Основной переключатель
             _buildMainSwitch(),
             const SizedBox(height: 24),
 
             if (_notificationsEnabled) ...[
-              // Интервал уведомлений
               _buildIntervalSection(),
               const SizedBox(height: 24),
 
-              // Время активности
               _buildTimeSection(),
               const SizedBox(height: 24),
 
-              // Информационная карточка
               _buildInfoCard(),
             ] else ...[
-              // Сообщение когда уведомления отключены
               _buildDisabledMessage(),
             ],
           ],
@@ -187,94 +163,38 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
 
   /// Секция интервала уведомлений
   Widget _buildIntervalSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Интервал уведомлений',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: kLightBlue,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.schedule,
-                    color: kBlue,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Интервал уведомлений',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Slider(
-                    value: _intervalHours.toDouble(),
-                    min: 1,
-                    max: 6,
-                    divisions: 5,
-                    activeColor: kBlue,
-                    inactiveColor: Colors.grey.shade300,
-                    onChanged: (value) {
-                      setState(() {
-                        _intervalHours = value.toInt();
-                      });
-                      _saveSettings();
-                    },
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: kBlue,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$_intervalHours ч',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: kWhite,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Уведомления будут приходить каждые $_intervalHours ${_getHourText(_intervalHours)}',
-              style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 14,
-              ),
-            ),
-          ],
         ),
-      ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 12.0,
+          children: List.generate(3, (index) {
+            final hour = index + 1;
+            return ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _intervalHours = hour;
+                });
+                _saveSettings();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _intervalHours == hour ? kBlue : kWhite,
+                foregroundColor: _intervalHours == hour ? kWhite : kBlue,
+                side: const BorderSide(color: kBlue),
+              ),
+              child: Text('$hour ч.'),
+            );
+          }),
+        ),
+      ],
     );
   }
 

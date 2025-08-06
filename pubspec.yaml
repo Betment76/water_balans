@@ -46,6 +46,7 @@ dependencies:
     sdk: flutter
   intl: ^0.20.2 # Уже добавлено, но уточняем что для локализации
   url_launcher: ^6.2.5 # Для открытия ссылок и email
+  flutter_svg: ^2.2.0
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +69,7 @@ flutter:
   # Добавляем папку с ассетами
   assets:
     - assets/images/
+    - assets/images/fish/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
