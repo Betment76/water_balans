@@ -281,7 +281,7 @@ class AboutScreen extends StatelessWidget {
             const SizedBox(height: 8),
             _buildPrivacyPoint('• Все данные хранятся локально на вашем устройстве'),
             _buildPrivacyPoint('• Мы не собираем и не передаем личную информацию'),
-            _buildPrivacyPoint('• Приложение работает без интернета'),
+            _buildPrivacyPoint('• Приложение работает без интернета, интернет нужен для данных о погоде'),
             _buildPrivacyPoint('• Уведомления настраиваются только локально'),
             const SizedBox(height: 12),
             const Text(
