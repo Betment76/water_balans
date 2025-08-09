@@ -4,12 +4,15 @@ import '../models/user_settings.dart';
 
 /// Сервис для работы с локальными уведомлениями
 class NotificationService {
-  static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
 
   /// Инициализация уведомлений
-  static Future<void> initialize() async {
-    const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings darwinSettings = DarwinInitializationSettings();
+  static Future initialize() async {
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings darwinSettings =
+        DarwinInitializationSettings();
     const InitializationSettings settings = InitializationSettings(
       android: androidSettings,
       iOS: darwinSettings,
@@ -19,7 +22,7 @@ class NotificationService {
   }
 
   /// Запланировать напоминания по пользовательским настройкам
-  static Future<void> scheduleReminders(UserSettings settings, {DateTime? lastIntake}) async {
+  static Future scheduleReminders(UserSettings settings, {DateTime? lastIntake}) async {
     await _notifications.cancelAll();
     final now = DateTime.now();
     final int startHour = 8;
@@ -27,7 +30,9 @@ class NotificationService {
     final int interval = settings.notificationIntervalHours;
     final bool smartMode = true; // Можно вынести в настройки
     final bool disableAtNight = true;
+
     DateTime firstTime = DateTime(now.year, now.month, now.day, startHour);
+
     if (lastIntake != null && smartMode) {
       // Если "умный режим" — уведомление через интервал после последнего приёма
       firstTime = lastIntake.add(Duration(hours: interval));
@@ -38,18 +43,24 @@ class NotificationService {
         return; // Не планируем уведомления на ночь
       }
     }
+
     for (int hour = firstTime.hour; hour <= endHour; hour += interval) {
       if (disableAtNight && (hour < startHour || hour > 22)) continue;
+
       final scheduled = DateTime(now.year, now.month, now.day, hour);
       if (scheduled.isBefore(now)) continue;
+
       await _notifications.zonedSchedule(
         hour, // id
         'Пейте воду!',
         'Ваша норма: ${settings.dailyNormML} мл',
         tz.TZDateTime.from(scheduled, tz.local),
         const NotificationDetails(
-          android: AndroidNotificationDetails('water_reminder', 'Напоминания о воде',
-              channelDescription: 'Регулярные напоминания пить воду', importance: Importance.max, priority: Priority.high),
+          android: AndroidNotificationDetails(
+              'water_reminder', 'Напоминания о воде',
+              channelDescription: 'Регулярные напоминания пить воду',
+              importance: Importance.max,
+              priority: Priority.high),
           iOS: DarwinNotificationDetails(),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -59,12 +70,12 @@ class NotificationService {
   }
 
   /// Отключить все уведомления
-  static Future<void> cancelAll() async {
+  static Future cancelAll() async {
     await _notifications.cancelAll();
   }
 
   /// Отменить все уведомления (алиас для cancelAll)
-  static Future<void> cancelAllNotifications() async {
+  static Future cancelAllNotifications() async {
     await _notifications.cancelAll();
   }
-} 
+}

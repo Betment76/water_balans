@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:water_balance/l10n/app_localizations.dart'; // Изменено на прямой импорт
-import 'package:water_balance/l10n/l10n.dart'; // Добавлен импорт для L10n
+import 'package:water_balance/l10n/app_localizations.dart';
+import 'package:water_balance/l10n/l10n.dart';
 import 'constants/app_colors.dart';
 import 'constants/app_strings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,16 +10,20 @@ import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  tz.initializeTimeZones();
+  final String timeZoneName = await FlutterTimezone.getLocalTimezone();
+  tz.setLocalLocation(tz.getLocation(timeZoneName));
   await NotificationService.initialize();
-  // Скрываем системные кнопки Android (immersive mode)
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   runApp(const ProviderScope(child: WaterBalanceApp()));
 }
 
-/// Корневое приложение
 class WaterBalanceApp extends StatelessWidget {
   const WaterBalanceApp({Key? key}) : super(key: key);
 
@@ -40,7 +44,6 @@ class WaterBalanceApp extends StatelessWidget {
       ),
       home: const AppInitializer(),
       debugShowCheckedModeBanner: false,
-      // Добавляем поддержку локализации
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
@@ -48,13 +51,12 @@ class WaterBalanceApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: L10n.supportedLocales,
-      locale: const Locale('ru'), // По умолчанию используем русский
+      locale: const Locale('ru'),
       localeResolutionCallback: L10n.localeResolutionCallback,
     );
   }
 }
 
-/// Виджет для инициализации приложения и проверки первого запуска
 class AppInitializer extends StatefulWidget {
   const AppInitializer({Key? key}) : super(key: key);
 
@@ -80,7 +82,6 @@ class _AppInitializerState extends State<AppInitializer> {
         _isLoading = false;
       });
     } catch (e) {
-      // В случае ошибки показываем onboarding
       setState(() {
         _isFirstLaunch = true;
         _isLoading = false;

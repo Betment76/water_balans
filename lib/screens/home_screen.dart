@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:water_balance/providers/user_settings_provider.dart';
+import 'package:water_balance/services/notification_service.dart';
 import 'package:water_balance/services/storage_service.dart';
 import 'package:water_balance/models/water_intake.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:water_balance/models/weather_data.dart';
 import 'package:water_balance/services/calculation_service.dart';
@@ -20,26 +20,13 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  // Плагин для локальных уведомлений
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
-  // Общее количество выпитой воды
-  int _waterIntake = 250;
-
-  // Таймер для уведомлений
-  Timer? _notificationTimer;
+  int _waterIntake = 0;
   StreamSubscription? _activitySubscription;
   WeatherData? _weatherData;
 
   @override
   void initState() {
     super.initState();
-    // Инициализация настроек уведомлений
-    _initializeNotifications();
-    // Запуск таймера для проверки необходимости уведомлений
-    _startNotificationTimer();
-    // Подписка на поток активности
     _activitySubscription = CalculationService.activityBasedAddition.listen((addition) {
       final settings = ref.read(userSettingsProvider);
       if (settings != null) {
@@ -53,73 +40,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
-    // Остановка таймера при уничтожении виджета
-    _notificationTimer?.cancel();
     _activitySubscription?.cancel();
     super.dispose();
   }
 
-  // Инициализация плагина уведомлений
-  void _initializeNotifications() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-    );
-
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-
-    // Запрос разрешения на уведомления на Android 13+
-    final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-    if (androidImplementation != null) {
-      await androidImplementation.requestNotificationsPermission();
-    }
-  }
-
-  // Запуск таймера для отправки уведомлений
-  void _startNotificationTimer() {
-    // Проверяем каждые 5 минут
-    _notificationTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
-      final waterGoal = ref.read(userSettingsProvider)?.dailyNormML ?? 2000;
-      // Если выпито меньше 80% от цели, отправляем уведомление
-      if ((_waterIntake / waterGoal) < 0.8) {
-        _showNotification();
-      }
-    });
-  }
-
-  // Показать уведомление
-  Future<void> _showNotification() async {
-    // Детали уведомления для Android
-    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'water_balance_channel', // ID канала
-      'Напоминания о воде', // Имя канала
-      channelDescription: 'Напоминания, чтобы выпить воды и поддерживать баланс', // Описание канала
-      importance: Importance.max, // Важность уведомления
-      priority: Priority.high, // Приоритет уведомления
-      showWhen: false, // Не показывать временную метку
-      largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'), // Иконка для уведомления
-    );
-
-    // Общие детали уведомления
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-    );
-
-    // Показ уведомления
-    await flutterLocalNotificationsPlugin.show(
-      0, // ID уведомления
-      'Спаси меня!', // Заголовок уведомления
-      'Я умираю от жажды! Срочно выпей воды, иначе я превращусь в сушеную воблу!', // Текст уведомления
-      platformChannelSpecifics, // Детали уведомления
-      payload: 'item x', // Полезная нагрузка
-    );
-  }
-
-  // Функция для добавления выпитой воды
   void _addWater(int amount) async {
     setState(() {
       _waterIntake += amount;
@@ -134,6 +58,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final intakes = await StorageService.loadWaterIntakes();
     intakes.add(newIntake);
     await StorageService.saveWaterIntakes(intakes);
+
+    // Reschedule notifications after adding water
+    final settings = ref.read(userSettingsProvider);
+    if (settings != null) {
+      await NotificationService.scheduleReminders(settings, lastIntake: DateTime.now());
+    }
   }
 
   Future<void> _loadTodaysIntake() async {
@@ -147,7 +77,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     try {
       LocationPermission permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        // Если нет разрешения, показываем погоду для Москвы
         final weather = await WeatherService.fetchWeatherByCity('Moscow');
         setState(() {
           _weatherData = weather;
@@ -179,7 +108,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final userSettings = ref.watch(userSettingsProvider);
     final waterGoal = userSettings?.dailyNormML ?? 2000;
-    // Процент выпитой воды от цели
     final double percentage = (_waterIntake / waterGoal).clamp(0.0, 1.0);
 
     return Scaffold(
@@ -212,16 +140,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: Column(
           children: <Widget>[
             const SizedBox(height: 20),
-            // Виджет аквариума
-            _Aquarium(percentage: percentage),
+            _Aquarium(percentage: percentage, waterIntake: _waterIntake),
             const SizedBox(height: 20),
-            // Отображение текущего прогресса
             Text(
               '$_waterIntake / $waterGoal мл',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 20),
-            // Кнопки для быстрого добавления воды
             Wrap(
               spacing: 12.0,
               alignment: WrapAlignment.center,
@@ -255,52 +180,79 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-// Виджет, представляющий аквариум
 class _Aquarium extends StatelessWidget {
   final double percentage;
+  final int waterIntake;
 
-  const _Aquarium({required this.percentage});
+  const _Aquarium({required this.percentage, required this.waterIntake});
 
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
     final double aquariumSize = screenWidth * 0.8;
     final double waterHeight = aquariumSize * percentage;
-    // Размер рыбки теперь зависит от прогресса
-    final double fishSize = 30 + 40 * percentage;
-
-    // Проверяем, достаточно ли воды для плавания
+    final double fishSize = (30 + 300 * percentage).clamp(30.0, aquariumSize * 0.8);
     final bool isSwimming = waterHeight > fishSize;
-
-    // Позиция рыбки по вертикали
-    // Если не плавает, она на дне. Иначе, плавает в пределах воды.
     final double fishBottom = isSwimming ? (waterHeight - fishSize) / 2 : 0;
 
     return Container(
       width: aquariumSize,
       height: aquariumSize,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.blue, width: 4),
+        // Убрали градиент и тень для прозрачности
       ),
       child: ClipOval(
         child: Stack(
           alignment: Alignment.bottomCenter,
           children: [
-            // Анимация воды
+            // Water
             AnimatedContainer(
               duration: const Duration(milliseconds: 500),
               height: waterHeight,
-              color: Colors.lightBlue.withOpacity(0.5),
+              color: Colors.lightBlue.withOpacity(0.6),
             ),
-            // Пузырьки
+
+            // Bubbles
             BubblesWidget(waterHeight: waterHeight),
-            // Рыбка
-            Positioned(
-              bottom: fishBottom,
-              child: FishWidget(
-                progress: percentage,
-                isSwimming: isSwimming, // Передаем состояние плавания
+
+            // Fish
+            if (waterIntake >= 300)
+              Positioned(
+                bottom: fishBottom,
+                child: FishWidget(
+                  progress: percentage,
+                  isSwimming: isSwimming,
+                  waterHeight: waterHeight,
+                  fishSize: fishSize,
+                  aquariumSize: aquariumSize,
+                ),
+              ),
+
+            // Glossy Highlight
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.3),
+                    Colors.white.withOpacity(0.0),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.0, 0.6],
+                ),
+              ),
+            ),
+
+            // Border
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.blue.withOpacity(0.6), // Более заметный синий контур
+                  width: 3, // Немного тоньше
+                ),
               ),
             ),
           ],

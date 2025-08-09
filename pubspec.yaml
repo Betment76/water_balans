@@ -47,12 +47,16 @@ dependencies:
   intl: ^0.20.2 # Уже добавлено, но уточняем что для локализации
   url_launcher: ^6.2.5 # Для открытия ссылок и email
   flutter_svg: ^2.2.0
+  timezone: ^0.10.1
+  http: ^1.5.0
+  flutter_timezone: ^4.1.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
   flutter_gen: ^5.0.0  # или более новая версия
+  flutter_launcher_icons: ^0.14.4
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

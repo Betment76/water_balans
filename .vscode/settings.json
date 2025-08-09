@@ -2,6 +2,9 @@
     "github.copilot.chat.byok.ollamaEndpoint": "http://localhost:1234",
     "github.copilot.chat.codesearch.enabled": true,
     "github.copilot.chat.localeOverride": "ru",
-    "cmake.sourceDirectory": "F:/Programs/AndroidStudioProject/water_balance/linux"
+    "cmake.sourceDirectory": "F:/Programs/AndroidStudioProject/water_balance/linux",
+    "trae.tab.enableRename": false,
+    "trae.tab.enableAutoImport": false,
+    "CodeGPT.apiKey": "Ollama"
    
 }

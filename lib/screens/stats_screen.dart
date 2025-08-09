@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/weather_data.dart';
 import '../services/weather_service.dart';
 import '../providers/user_settings_provider.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:water_balance/l10n/app_localizations.dart'; // Измененный импорт
+import 'package:water_balance/l10n/app_localizations.dart';
 
 const Color kBlue = Color(0xFF1976D2);
 const Color kLightBlue = Color(0xFF64B5F6);
@@ -119,8 +119,7 @@ class _WeatherCard extends StatefulWidget {
 }
 
 class _WeatherCardState extends State<_WeatherCard> {
-  double? _temperature;
-  String? _city;
+  WeatherData? _weatherData;
   bool _loading = true;
   String? _error;
 
@@ -131,22 +130,16 @@ class _WeatherCardState extends State<_WeatherCard> {
   }
 
   Future<void> _fetchWeather() async {
-    print('[WeatherCard] _fetchWeather called');
     setState(() {
       _loading = true;
       _error = null;
-      _city = null;
     });
     try {
       LocationPermission permission = await Geolocator.requestPermission();
-      print('[WeatherCard] permission: $permission');
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        print('[WeatherCard] Нет разрешения, вызываю WeatherService.fetchTemperatureByCity');
-        double? temp = await WeatherService.fetchTemperatureByCity('Москва');
-        print('[WeatherCard] После WeatherService.fetchTemperatureByCity, temp: $temp');
+        final weather = await WeatherService.fetchWeatherByCity('Москва');
         setState(() {
-          _temperature = temp;
-          _city = 'Москва';
+          _weatherData = weather;
           _error = 'Нет доступа к геолокации, показана погода для Москвы';
           _loading = false;
         });
@@ -155,26 +148,12 @@ class _WeatherCardState extends State<_WeatherCard> {
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.low),
       );
-      print('[WeatherCard] Координаты: ${pos.latitude}, ${pos.longitude}');
-      print('[WeatherCard] Вызываю WeatherService.fetchTemperature');
-      double? temp = await WeatherService.fetchTemperature(latitude: pos.latitude, longitude: pos.longitude);
-      print('[WeatherCard] После WeatherService.fetchTemperature, temp: $temp');
-      String? city;
-      try {
-        final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
-        if (placemarks.isNotEmpty) {
-          city = placemarks.first.locality ?? placemarks.first.administrativeArea ?? placemarks.first.country;
-        }
-      } catch (e) {
-        print('[WeatherCard] Ошибка определения города: $e');
-      }
+      final weather = await WeatherService.fetchWeather(latitude: pos.latitude, longitude: pos.longitude);
       setState(() {
-        _temperature = temp;
-        _city = city;
+        _weatherData = weather;
         _loading = false;
       });
     } catch (e) {
-      print('[WeatherCard] Exception: $e');
       setState(() {
         _error = 'Ошибка определения погоды';
         _loading = false;
@@ -184,7 +163,6 @@ class _WeatherCardState extends State<_WeatherCard> {
 
   @override
   Widget build(BuildContext context) {
-    print('[WeatherCard] build called');
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
@@ -199,8 +177,8 @@ class _WeatherCardState extends State<_WeatherCard> {
           Expanded(
             child: _loading
                 ? const Text('Загрузка погоды...', style: TextStyle(color: kWhite, fontSize: 18))
-                : (_temperature != null
-                    ? Text('${_temperature!.round()}°C${_city != null ? ', $_city' : ''}', style: const TextStyle(color: kWhite, fontSize: 20, fontWeight: FontWeight.bold))
+                : (_weatherData != null
+                    ? Text('${_weatherData!.temperature.round()}°C${_weatherData!.city != null ? ', ${_weatherData!.city}' : ''}', style: const TextStyle(color: kWhite, fontSize: 20, fontWeight: FontWeight.bold))
                     : Text(_error ?? 'Нет данных о погоде', style: const TextStyle(color: kWhite, fontSize: 18)) ),
           ),
           IconButton(
