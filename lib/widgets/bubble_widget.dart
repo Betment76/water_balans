@@ -49,7 +49,12 @@ class _BubblesWidgetState extends State<BubblesWidget>
       for (var bubble in _bubbles) {
         bubble.y -= bubble.speed;
       }
-      _bubbles.removeWhere((bubble) => bubble.y < (1 - widget.waterHeight / context.size!.height) - 0.1);
+      final renderBoxSize = context.size;
+      if (renderBoxSize != null && renderBoxSize.height > 0) {
+        _bubbles.removeWhere(
+          (bubble) => bubble.y < (1 - widget.waterHeight / renderBoxSize.height) - 0.1,
+        );
+      }
     });
   }
 

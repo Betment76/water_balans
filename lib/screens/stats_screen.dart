@@ -137,10 +137,17 @@ class _WeatherCardState extends State<_WeatherCard> {
     try {
       LocationPermission permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        final weather = await WeatherService.fetchWeatherByCity('Москва');
+        final weather = await WeatherService.fetchWeatherByCity('Moscow');
+        if (!mounted) return;
         setState(() {
-          _weatherData = weather;
-          _error = 'Нет доступа к геолокации, показана погода для Москвы';
+          _weatherData = weather != null
+              ? WeatherData(
+                  temperature: weather.temperature,
+                  condition: weather.condition,
+                  city: null,
+                )
+              : null;
+          _error = 'Нет доступа к геолокации';
           _loading = false;
         });
         return;
@@ -149,11 +156,13 @@ class _WeatherCardState extends State<_WeatherCard> {
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.low),
       );
       final weather = await WeatherService.fetchWeather(latitude: pos.latitude, longitude: pos.longitude);
+      if (!mounted) return;
       setState(() {
         _weatherData = weather;
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Ошибка определения погоды';
         _loading = false;

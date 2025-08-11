@@ -7,7 +7,7 @@ import '../services/weather_service.dart';
 import '../services/notification_service.dart';
 import '../services/calculation_service.dart';
 import '../constants/app_colors.dart';
-import 'about_screen.dart';
+import 'main_navigation_screen.dart';
 
 /// Экран настроек пользователя
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -167,7 +167,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Данные сброшены')),
           );
-          Navigator.of(context).pushReplacementNamed('/');
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+          );
         }
       } catch (e) {
         if (mounted) {
@@ -446,5 +448,3 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
 }
-
-const Color kBlue = Color(0xFF1976D2);

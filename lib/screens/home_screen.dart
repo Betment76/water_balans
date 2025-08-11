@@ -78,13 +78,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       LocationPermission permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         final weather = await WeatherService.fetchWeatherByCity('Moscow');
+        if (!mounted) return;
         setState(() {
-          _weatherData = weather;
+          _weatherData = weather != null
+              ? WeatherData(
+                  temperature: weather.temperature,
+                  condition: weather.condition,
+                  city: null,
+                )
+              : null;
         });
         return;
       }
       final position = await Geolocator.getCurrentPosition();
       final weather = await WeatherService.fetchWeather(latitude: position.latitude, longitude: position.longitude);
+      if (!mounted) return;
       setState(() {
         _weatherData = weather;
       });

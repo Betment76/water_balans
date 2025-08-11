@@ -25,8 +25,8 @@ class NotificationService {
   static Future scheduleReminders(UserSettings settings, {DateTime? lastIntake}) async {
     await _notifications.cancelAll();
     final now = DateTime.now();
-    final int startHour = 8;
-    final int endHour = 20;
+    final int startHour = settings.notificationStartHour;
+    final int endHour = settings.notificationEndHour;
     final int interval = settings.notificationIntervalHours;
     final bool smartMode = true; // Можно вынести в настройки
     final bool disableAtNight = true;
@@ -45,7 +45,7 @@ class NotificationService {
     }
 
     for (int hour = firstTime.hour; hour <= endHour; hour += interval) {
-      if (disableAtNight && (hour < startHour || hour > 22)) continue;
+      if (disableAtNight && (hour < startHour || hour > endHour)) continue;
 
       final scheduled = DateTime(now.year, now.month, now.day, hour);
       if (scheduled.isBefore(now)) continue;

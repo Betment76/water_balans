@@ -96,3 +96,10 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Keystore files
+*.jks
+key.properties
+
+# Local config with API keys
+lib/constants/config.dart
