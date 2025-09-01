@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'services/rustore_review_service.dart';
+import 'services/mytarget_ad_service.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -22,6 +23,7 @@ void main() async {
   tz.setLocalLocation(tz.getLocation(timeZoneName));
   await NotificationService.initialize();
   await RuStoreReviewService.initialize();
+  await MyTargetAdService.initialize();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   runApp(const ProviderScope(child: WaterBalanceApp()));
 }

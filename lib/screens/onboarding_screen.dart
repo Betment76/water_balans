@@ -17,7 +17,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
-  
+
   int _currentPage = 0;
   int _activityLevel = 1; // 0 - низкая, 1 - средняя, 2 - высокая
   String _selectedUnit = 'мл'; // мл, л, oz
@@ -80,10 +80,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   void _completeOnboarding() async {
     final weight = int.tryParse(_weightController.text) ?? 70;
-    final height = _heightController.text.isNotEmpty 
-        ? int.tryParse(_heightController.text) 
+    final height = _heightController.text.isNotEmpty
+        ? int.tryParse(_heightController.text)
         : null;
-    
+
     final settings = UserSettings(
       weight: weight,
       height: height,
@@ -98,11 +98,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // Сохраняем через провайдер
     try {
       await ref.read(userSettingsProvider.notifier).save(settings);
-      print('[_completeOnboarding] Настройки пользователя сохранены через провайдер.');
+      print(
+        '[_completeOnboarding] Настройки пользователя сохранены через провайдер.',
+      );
     } catch (e) {
       print('[_completeOnboarding] Ошибка при сохранении настроек: $e');
     }
-    
+
     // Настраиваем уведомления если включены
     if (_notificationsEnabled) {
       try {
@@ -118,7 +120,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       await StorageService.setFirstLaunch(false);
       print('[_completeOnboarding] Флаг первого запуска установлен в false.');
     } catch (e) {
-      print('[_completeOnboarding] Ошибка при установке флага первого запуска: $e');
+      print(
+        '[_completeOnboarding] Ошибка при установке флага первого запуска: $e',
+      );
     }
 
     // Переходим к главному экрану
@@ -157,8 +161,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       height: 4,
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       decoration: BoxDecoration(
-                        color: index <= _currentPage 
-                            ? Colors.blue 
+                        color: index <= _currentPage
+                            ? Colors.blue
                             : Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(2),
                       ),
@@ -167,7 +171,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
               ),
             ),
-            
+
             // Контент страниц
             Expanded(
               child: PageView.builder(
@@ -183,7 +187,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 },
               ),
             ),
-            
+
             // Кнопки навигации
             Container(
               padding: const EdgeInsets.all(24),
@@ -226,51 +230,41 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-          // Иконка
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: page.color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(60),
+            // Иконка
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: page.color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(60),
+              ),
+              child: Icon(page.icon, size: 60, color: page.color),
             ),
-            child: Icon(
-              page.icon,
-              size: 60,
-              color: page.color,
+
+            const SizedBox(height: 32),
+
+            // Заголовок
+            Text(
+              page.title,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
-          ),
-          
-          const SizedBox(height: 32),
-          
-          // Заголовок
-          Text(
-            page.title,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+
+            const SizedBox(height: 16),
+
+            // Подзаголовок
+            Text(
+              page.subtitle,
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Подзаголовок
-          Text(
-            page.subtitle,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          
-          const SizedBox(height: 32),
-          
-          // Специфичный контент для каждой страницы
-          if (pageIndex == 1) _buildUserInfoForm(),
-          if (pageIndex == 2) _buildNotificationsForm(),
-        ],
+
+            const SizedBox(height: 32),
+
+            // Специфичный контент для каждой страницы
+            if (pageIndex == 1) _buildUserInfoForm(),
+            if (pageIndex == 2) _buildNotificationsForm(),
+          ],
         ),
       ),
     );
@@ -279,81 +273,93 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget _buildUserInfoForm() {
     return Column(
       children: [
-        // Вес
-        TextField(
-          controller: _weightController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Ваш вес (кг)',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.monitor_weight),
-          ),
+        // Вес и рост в одной строке
+        Row(
+          children: [
+            // Поле ввода веса
+            Expanded(
+              flex: 1,
+              child: TextField(
+                controller: _weightController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Вес (кг)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.monitor_weight),
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 16),
+
+            // Поле ввода роста
+            Expanded(
+              flex: 1,
+              child: TextField(
+                controller: _heightController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Рост (см)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.height),
+                  hintText: 'Необязательно',
+                ),
+              ),
+            ),
+          ],
         ),
-        
-        const SizedBox(height: 16),
-        
-        // Рост
-        TextField(
-          controller: _heightController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Ваш рост (см) - необязательно',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.height),
-          ),
-        ),
-        
+
         const SizedBox(height: 24),
-        
+
         // Уровень активности
         const Text(
           'Уровень активности:',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         Row(
           children: [
-                         Expanded(
-               child: _ActivityLevelCard(
-                 title: 'Низкая',
-                 subtitle: 'Малоподвижный образ жизни',
-                 isSelected: _activityLevel == 0,
-                 onTap: () => setState(() => _activityLevel = 0),
-               ),
-             ),
-             const SizedBox(width: 8),
-             Expanded(
-               child: _ActivityLevelCard(
-                 title: 'Средняя',
-                 subtitle: 'Умеренная активность',
-                 isSelected: _activityLevel == 1,
-                 onTap: () => setState(() => _activityLevel = 1),
-               ),
-             ),
-             const SizedBox(width: 8),
-             Expanded(
-               child: _ActivityLevelCard(
-                 title: 'Высокая',
-                 subtitle: 'Спорт, активный образ жизни',
-                 isSelected: _activityLevel == 2,
-                 onTap: () => setState(() => _activityLevel = 2),
-               ),
-             ),
+            Expanded(
+              child: _ActivityLevelCard(
+                title: 'Низкая',
+                subtitle: 'Малоподвижный образ жизни',
+                isSelected: _activityLevel == 0,
+                onTap: () => setState(() => _activityLevel = 0),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _ActivityLevelCard(
+                title: 'Средняя',
+                subtitle: 'Умеренная активность',
+                isSelected: _activityLevel == 1,
+                onTap: () => setState(() => _activityLevel = 1),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _ActivityLevelCard(
+                title: 'Высокая',
+                subtitle: 'Спорт, активный образ жизни',
+                isSelected: _activityLevel == 2,
+                onTap: () => setState(() => _activityLevel = 2),
+              ),
+            ),
           ],
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         // Единицы измерения
         const Text(
           'Единицы измерения:',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: ['мл', 'л', 'oz'].map((unit) {
@@ -388,14 +394,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             });
           },
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         if (_notificationsEnabled)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-                              color: Colors.blue.withValues(alpha: 0.1),
+              color: Colors.blue.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Column(

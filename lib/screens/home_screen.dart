@@ -12,6 +12,7 @@ import 'package:water_balance/services/weather_service.dart';
 import 'package:water_balance/services/rustore_review_service.dart';
 import 'package:water_balance/widgets/bubble_widget.dart';
 import 'package:water_balance/widgets/fish_widget.dart';
+import 'package:water_balance/widgets/banner_ad_widget.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -188,30 +189,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
         ],
       ),
-      body: Center(
-        child: Column(
-          children: <Widget>[
-            const SizedBox(height: 20),
-            _Aquarium(percentage: percentage, waterIntake: _waterIntake),
-            const SizedBox(height: 20),
-            Text(
-              '$_waterIntake / $waterGoal мл',
-              style: Theme.of(context).textTheme.headlineSmall,
+      body: Column(
+        children: [
+          // Рекламный баннер MyTarget 320x50 под верхним баром (ID: 1895039)
+          const Center(child: BannerAdWidget()),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Center(
+              child: Column(
+                children: <Widget>[
+                  const SizedBox(height: 20),
+                  _Aquarium(percentage: percentage, waterIntake: _waterIntake),
+                  const SizedBox(height: 20),
+                  Text(
+                    '$_waterIntake / $waterGoal мл',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 12.0,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      _buildAddWaterButton(50),
+                      _buildAddWaterButton(100),
+                      _buildAddWaterButton(150),
+                      _buildAddWaterButton(200),
+                      _buildAddWaterButton(250),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 20),
-            Wrap(
-              spacing: 12.0,
-              alignment: WrapAlignment.center,
-              children: [
-                _buildAddWaterButton(50),
-                _buildAddWaterButton(100),
-                _buildAddWaterButton(150),
-                _buildAddWaterButton(200),
-                _buildAddWaterButton(250),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

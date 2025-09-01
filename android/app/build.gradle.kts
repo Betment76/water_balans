@@ -58,4 +58,6 @@ flutter {
 dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // MyTarget SDK для рекламы (обновленная версия)
+    implementation("com.my.target:mytarget-sdk:5.27.2")
 }
