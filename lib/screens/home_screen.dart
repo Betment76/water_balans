@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:water_balance/models/weather_data.dart';
 import 'package:water_balance/services/calculation_service.dart';
 import 'package:water_balance/services/weather_service.dart';
+import 'package:water_balance/services/rustore_review_service.dart';
 import 'package:water_balance/widgets/bubble_widget.dart';
 import 'package:water_balance/widgets/fish_widget.dart';
 
@@ -21,17 +22,22 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _waterIntake = 0;
+  int _totalWaterAddedToday = 0; // Счётчик добавленной воды за день
   StreamSubscription? _activitySubscription;
   WeatherData? _weatherData;
 
   @override
   void initState() {
     super.initState();
-    _activitySubscription = CalculationService.activityBasedAddition.listen((addition) {
+    _activitySubscription = CalculationService.activityBasedAddition.listen((
+      addition,
+    ) {
       final settings = ref.read(userSettingsProvider);
       if (settings != null) {
         final newGoal = settings.dailyNormML + addition;
-        ref.read(userSettingsProvider.notifier).save(settings.copyWith(dailyNormML: newGoal));
+        ref
+            .read(userSettingsProvider.notifier)
+            .save(settings.copyWith(dailyNormML: newGoal));
       }
     });
     _fetchWeather();
@@ -47,6 +53,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _addWater(int amount) async {
     setState(() {
       _waterIntake += amount;
+      _totalWaterAddedToday += amount;
     });
 
     final newIntake = WaterIntake(
@@ -62,7 +69,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Reschedule notifications after adding water
     final settings = ref.read(userSettingsProvider);
     if (settings != null) {
-      await NotificationService.scheduleReminders(settings, lastIntake: DateTime.now());
+      await NotificationService.scheduleReminders(
+        settings,
+        lastIntake: DateTime.now(),
+      );
+    }
+
+    // Проверяем, нужно ли показать отзыв
+    _checkForReviewRequest();
+  }
+
+  /// Проверяем, нужно ли показать запрос на отзыв
+  void _checkForReviewRequest() async {
+    try {
+      final userSettings = ref.read(userSettingsProvider);
+      if (userSettings == null) return;
+
+      final waterGoal = userSettings.dailyNormML;
+      final percentage = (_waterIntake / waterGoal).clamp(0.0, 1.0);
+
+      // Показываем отзыв при достижении 75% дневной нормы
+      // или после добавления 1000мл воды за день
+      if (percentage >= 0.75 || _totalWaterAddedToday >= 1000) {
+        final success = await RuStoreReviewService.requestReview();
+        if (success) {
+          print('Отзыв успешно запрощен');
+          // Сбрасываем счётчик, чтобы не показывать отзыв повторно
+          _totalWaterAddedToday = 0;
+        }
+      }
+    } catch (e) {
+      print('Ошибка при проверке отзыва: $e');
     }
   }
 
@@ -70,13 +107,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final intakes = await StorageService.getWaterIntakesForDate(DateTime.now());
     setState(() {
       _waterIntake = intakes.fold(0, (sum, item) => sum + item.volumeML);
+      _totalWaterAddedToday = _waterIntake; // Инициализируем счётчик
     });
   }
 
   Future<void> _fetchWeather() async {
     try {
       LocationPermission permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         final weather = await WeatherService.fetchWeatherByCity('Moscow');
         if (!mounted) return;
         setState(() {
@@ -91,7 +130,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return;
       }
       final position = await Geolocator.getCurrentPosition();
-      final weather = await WeatherService.fetchWeather(latitude: position.latitude, longitude: position.longitude);
+      final weather = await WeatherService.fetchWeather(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
       if (!mounted) return;
       setState(() {
         _weatherData = weather;
@@ -120,7 +162,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: _weatherData != null ? _getWeatherIcon(_weatherData!.condition) : null,
+        leading: _weatherData != null
+            ? _getWeatherIcon(_weatherData!.condition)
+            : null,
         title: const Text('Водный баланс'),
         centerTitle: true,
         actions: [
@@ -199,7 +243,10 @@ class _Aquarium extends StatelessWidget {
     final double screenWidth = MediaQuery.of(context).size.width;
     final double aquariumSize = screenWidth * 0.8;
     final double waterHeight = aquariumSize * percentage;
-    final double fishSize = (30 + 300 * percentage).clamp(30.0, aquariumSize * 0.8);
+    final double fishSize = (30 + 300 * percentage).clamp(
+      30.0,
+      aquariumSize * 0.8,
+    );
     final bool isSwimming = waterHeight > fishSize;
     final double fishBottom = isSwimming ? (waterHeight - fishSize) / 2 : 0;
 
@@ -258,7 +305,9 @@ class _Aquarium extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: Colors.blue.withOpacity(0.6), // Более заметный синий контур
+                  color: Colors.blue.withOpacity(
+                    0.6,
+                  ), // Более заметный синий контур
                   width: 3, // Немного тоньше
                 ),
               ),

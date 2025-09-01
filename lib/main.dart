@@ -8,6 +8,7 @@ import 'constants/app_strings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'services/notification_service.dart';
 import 'services/storage_service.dart';
+import 'services/rustore_review_service.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -20,6 +21,7 @@ void main() async {
   final String timeZoneName = await FlutterTimezone.getLocalTimezone();
   tz.setLocalLocation(tz.getLocation(timeZoneName));
   await NotificationService.initialize();
+  await RuStoreReviewService.initialize();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   runApp(const ProviderScope(child: WaterBalanceApp()));
 }
@@ -76,12 +78,29 @@ class _AppInitializerState extends State<AppInitializer> {
 
   Future<void> _checkFirstLaunch() async {
     try {
+      // Отладочный вывод всех сохраненных данных
+      await StorageService.debugShowAllKeys();
+
+      // Проверяем, есть ли сохраненные настройки пользователя
+      final userSettings = await StorageService.loadUserSettings();
       final isFirstLaunch = await StorageService.isFirstLaunch();
+
+      // Если есть настройки пользователя (рост/вес), значит это не первый запуск
+      final hasUserData =
+          userSettings != null &&
+          (userSettings.height == null || userSettings.height! > 0) &&
+          userSettings.weight > 0;
+
+      print('Настройки пользователя: $userSettings');
+      print('Первый запуск: $isFirstLaunch');
+      print('Есть данные пользователя: $hasUserData');
+
       setState(() {
-        _isFirstLaunch = isFirstLaunch;
+        _isFirstLaunch = isFirstLaunch && !hasUserData;
         _isLoading = false;
       });
     } catch (e) {
+      print('Ошибка при проверке первого запуска: $e');
       setState(() {
         _isFirstLaunch = true;
         _isLoading = false;
@@ -92,14 +111,10 @@ class _AppInitializerState extends State<AppInitializer> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return _isFirstLaunch 
+    return _isFirstLaunch
         ? const OnboardingScreen()
         : const MainNavigationScreen();
   }

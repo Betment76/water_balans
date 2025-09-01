@@ -6,6 +6,7 @@ import '../providers/user_settings_provider.dart';
 import '../services/weather_service.dart';
 import '../services/notification_service.dart';
 import '../services/calculation_service.dart';
+import '../services/rustore_review_service.dart';
 import '../constants/app_colors.dart';
 import 'main_navigation_screen.dart';
 
@@ -21,7 +22,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final TextEditingController weightController = TextEditingController();
   final TextEditingController heightController = TextEditingController();
   final TextEditingController dailyNormController = TextEditingController();
-  
+
   int activityLevel = 1;
   String selectedUnit = 'мл';
   bool _isProUser = false;
@@ -103,11 +104,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _weightError = null;
       _heightError = null;
     });
-    
+
     final weight = int.tryParse(weightController.text);
-    final height = heightController.text.isNotEmpty ? int.tryParse(heightController.text) : null;
+    final height = heightController.text.isNotEmpty
+        ? int.tryParse(heightController.text)
+        : null;
     final dailyNorm = int.tryParse(dailyNormController.text);
-    
+
     if (weight == null || weight < 30 || weight > 200) {
       setState(() => _weightError = 'Введите вес от 30 до 200');
       return;
@@ -116,7 +119,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       setState(() => _heightError = 'Рост от 100 до 250');
       return;
     }
-    
+
     final settings = UserSettings(
       weight: weight,
       height: height,
@@ -126,13 +129,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       notificationIntervalHours: 2,
       unit: selectedUnit,
     );
-    
+
     ref.read(userSettingsProvider.notifier).save(settings);
     NotificationService.scheduleReminders(settings);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Настройки сохранены')),
-    );
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Настройки сохранены')));
   }
 
   Future<void> _resetData() async {
@@ -162,21 +165,136 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       try {
         await StorageService.clearAllData();
         await NotificationService.cancelAllNotifications();
-        
+
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Данные сброшены')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Данные сброшены')));
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+            MaterialPageRoute(
+              builder: (context) => const MainNavigationScreen(),
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ошибка сброса: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Ошибка сброса: $e')));
         }
+      }
+    }
+  }
+
+  /// Запросить отзыв у пользователя
+  Future<void> _requestReview() async {
+    try {
+      final success = await RuStoreReviewService.requestReview();
+      if (mounted) {
+        String message;
+        Color backgroundColor;
+
+        if (success) {
+          message = 'Отзыв успешно запрощен!';
+          backgroundColor = Colors.green;
+        } else {
+          // Получаем статистику для более детального объяснения
+          final stats = await RuStoreReviewService.getRequestStats();
+          final canRequest = stats['canRequest'] as bool? ?? false;
+          final requestCount = stats['requestCount'] as int? ?? 0;
+          final maxRequests = stats['maxRequests'] as int? ?? 3;
+
+          if (!canRequest && requestCount >= maxRequests) {
+            message = 'Достигнут лимит запросов (макс. $maxRequests)';
+          } else if (!canRequest) {
+            message = 'Отзыв можно запросить через несколько дней';
+          } else {
+            message =
+                'Невозможно показать отзыв:\n'
+                '• RuStore не установлен на устройстве\n'
+                '• Пользователь не авторизован в RuStore\n'
+                '• Приложение не опубликовано в RuStore';
+          }
+          backgroundColor = Colors.orange;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: backgroundColor,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Показать статистику отзывов
+  Future<void> _showReviewStats() async {
+    try {
+      final stats = await RuStoreReviewService.getRequestStats();
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Статистика отзывов'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Количество запросов: ${stats['requestCount']} / ${stats['maxRequests']}',
+                ),
+                const SizedBox(height: 8),
+                Text('Можно запросить: ${stats['canRequest'] ? 'Да' : 'Нет'}'),
+                const SizedBox(height: 8),
+                if (stats['lastRequest'] != null)
+                  Text(
+                    'Последний запрос: ${DateTime.parse(stats['lastRequest']).toString().substring(0, 16)}',
+                  ),
+                const SizedBox(height: 8),
+                if (stats['firstLaunch'] != null)
+                  Text(
+                    'Первый запуск: ${DateTime.parse(stats['firstLaunch']).toString().substring(0, 16)}',
+                  ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Правила:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text('• Мин. дней между запросами: ${stats['minDaysBetween']}'),
+                Text(
+                  '• Мин. дней перед первым запросом: ${stats['minDaysBeforeFirst']}',
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Закрыть'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка получения статистики: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -188,7 +306,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       appBar: AppBar(
         title: const Text('Настройки'),
         centerTitle: true,
-        backgroundColor: kBlue,
+        backgroundColor: AppColors.primary,
         foregroundColor: AppColors.kWhite,
         elevation: 0,
       ),
@@ -209,7 +327,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         labelText: 'Вес (кг)',
                         errorText: _weightError,
                         border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -222,7 +343,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         labelText: 'Рост (см)',
                         errorText: _heightError,
                         border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -235,7 +359,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       decoration: InputDecoration(
                         labelText: 'Норма (мл)',
                         border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -250,172 +377,210 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   fontStyle: FontStyle.italic,
                 ),
               ),
-                             const SizedBox(height: 16),
-               const Text('Уровень активности'),
-               const SizedBox(height: 8),
-               Row(
-                 children: [
-                   Expanded(
-                     child: Padding(
-                       padding: const EdgeInsets.only(right: 4),
-                       child: ElevatedButton(
-                         onPressed: () {
-                           setState(() => activityLevel = 0);
-                           _updateDailyNorm();
-                         },
-                         style: ElevatedButton.styleFrom(
-                           backgroundColor: activityLevel == 0 ? kBlue : Colors.grey.shade200,
-                           foregroundColor: activityLevel == 0 ? Colors.white : Colors.black87,
-                           elevation: activityLevel == 0 ? 2 : 0,
-                           shape: RoundedRectangleBorder(
-                             borderRadius: BorderRadius.circular(8),
-                           ),
-                         ),
-                         child: const Text('Низкий'),
-                       ),
-                     ),
-                   ),
-                   Expanded(
-                     child: Padding(
-                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                       child: ElevatedButton(
-                         onPressed: () {
-                           setState(() => activityLevel = 1);
-                           _updateDailyNorm();
-                         },
-                         style: ElevatedButton.styleFrom(
-                           backgroundColor: activityLevel == 1 ? kBlue : Colors.grey.shade200,
-                           foregroundColor: activityLevel == 1 ? Colors.white : Colors.black87,
-                           elevation: activityLevel == 1 ? 2 : 0,
-                           shape: RoundedRectangleBorder(
-                             borderRadius: BorderRadius.circular(8),
-                           ),
-                         ),
-                         child: const Text('Средний'),
-                       ),
-                     ),
-                   ),
-                   Expanded(
-                     child: Padding(
-                       padding: const EdgeInsets.only(left: 4),
-                       child: ElevatedButton(
-                         onPressed: () {
-                           setState(() => activityLevel = 2);
-                           _updateDailyNorm();
-                         },
-                         style: ElevatedButton.styleFrom(
-                           backgroundColor: activityLevel == 2 ? kBlue : Colors.grey.shade200,
-                           foregroundColor: activityLevel == 2 ? Colors.white : Colors.black87,
-                           elevation: activityLevel == 2 ? 2 : 0,
-                           shape: RoundedRectangleBorder(
-                             borderRadius: BorderRadius.circular(8),
-                           ),
-                         ),
-                         child: const Text('Высокий'),
-                       ),
-                     ),
-                   ),
-                 ],
-               ),
+              const SizedBox(height: 16),
+              const Text('Уровень активности'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() => activityLevel = 0);
+                          _updateDailyNorm();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: activityLevel == 0
+                              ? AppColors.primary
+                              : Colors.grey.shade200,
+                          foregroundColor: activityLevel == 0
+                              ? Colors.white
+                              : Colors.black87,
+                          elevation: activityLevel == 0 ? 2 : 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('Низкий'),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() => activityLevel = 1);
+                          _updateDailyNorm();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: activityLevel == 1
+                              ? AppColors.primary
+                              : Colors.grey.shade200,
+                          foregroundColor: activityLevel == 1
+                              ? Colors.white
+                              : Colors.black87,
+                          elevation: activityLevel == 1 ? 2 : 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('Средний'),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() => activityLevel = 2);
+                          _updateDailyNorm();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: activityLevel == 2
+                              ? AppColors.primary
+                              : Colors.grey.shade200,
+                          foregroundColor: activityLevel == 2
+                              ? Colors.white
+                              : Colors.black87,
+                          elevation: activityLevel == 2 ? 2 : 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('Высокий'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          
-          const SizedBox(height: 24),
-          
-                     // Единицы измерения
-           _buildSection(
-             title: 'Единицы измерения',
-             children: [
-               Row(
-                 children: [
-                   Expanded(
-                     child: Padding(
-                       padding: const EdgeInsets.only(right: 4),
-                       child: ElevatedButton(
-                         onPressed: () => setState(() => selectedUnit = 'мл'),
-                         style: ElevatedButton.styleFrom(
-                           backgroundColor: selectedUnit == 'мл' ? kBlue : Colors.grey.shade200,
-                           foregroundColor: selectedUnit == 'мл' ? Colors.white : Colors.black87,
-                           elevation: selectedUnit == 'мл' ? 2 : 0,
-                           shape: RoundedRectangleBorder(
-                             borderRadius: BorderRadius.circular(8),
-                           ),
-                         ),
-                         child: const Text('мл'),
-                       ),
-                     ),
-                   ),
-                   Expanded(
-                     child: Padding(
-                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                       child: ElevatedButton(
-                         onPressed: () => setState(() => selectedUnit = 'л'),
-                         style: ElevatedButton.styleFrom(
-                           backgroundColor: selectedUnit == 'л' ? kBlue : Colors.grey.shade200,
-                           foregroundColor: selectedUnit == 'л' ? Colors.white : Colors.black87,
-                           elevation: selectedUnit == 'л' ? 2 : 0,
-                           shape: RoundedRectangleBorder(
-                             borderRadius: BorderRadius.circular(8),
-                           ),
-                         ),
-                         child: const Text('л'),
-                       ),
-                     ),
-                   ),
-                   Expanded(
-                     child: Padding(
-                       padding: const EdgeInsets.only(left: 4),
-                       child: ElevatedButton(
-                         onPressed: () => setState(() => selectedUnit = 'oz'),
-                         style: ElevatedButton.styleFrom(
-                           backgroundColor: selectedUnit == 'oz' ? kBlue : Colors.grey.shade200,
-                           foregroundColor: selectedUnit == 'oz' ? Colors.white : Colors.black87,
-                           elevation: selectedUnit == 'oz' ? 2 : 0,
-                           shape: RoundedRectangleBorder(
-                             borderRadius: BorderRadius.circular(8),
-                           ),
-                         ),
-                         child: const Text('oz'),
-                       ),
-                     ),
-                   ),
-                 ],
-               ),
-             ],
-           ),
-          
 
-          
-                     
-          
           const SizedBox(height: 24),
-          
-                     // Pro функции (будут добавлены в следующих версиях)
-           // _buildProSection(),
-          
+
+          // Единицы измерения
+          _buildSection(
+            title: 'Единицы измерения',
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: ElevatedButton(
+                        onPressed: () => setState(() => selectedUnit = 'мл'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedUnit == 'мл'
+                              ? AppColors.primary
+                              : Colors.grey.shade200,
+                          foregroundColor: selectedUnit == 'мл'
+                              ? Colors.white
+                              : Colors.black87,
+                          elevation: selectedUnit == 'мл' ? 2 : 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('мл'),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: ElevatedButton(
+                        onPressed: () => setState(() => selectedUnit = 'л'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedUnit == 'л'
+                              ? AppColors.primary
+                              : Colors.grey.shade200,
+                          foregroundColor: selectedUnit == 'л'
+                              ? Colors.white
+                              : Colors.black87,
+                          elevation: selectedUnit == 'л' ? 2 : 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('л'),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: ElevatedButton(
+                        onPressed: () => setState(() => selectedUnit = 'oz'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedUnit == 'oz'
+                              ? AppColors.primary
+                              : Colors.grey.shade200,
+                          foregroundColor: selectedUnit == 'oz'
+                              ? Colors.white
+                              : Colors.black87,
+                          elevation: selectedUnit == 'oz' ? 2 : 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('oz'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
           const SizedBox(height: 24),
-          
-                     
-           
-           // Опасная зона
-           _buildSection(
-             title: 'Опасная зона',
-             children: [
-               ListTile(
-                 leading: const Icon(Icons.delete_forever, color: Colors.red),
-                 title: const Text('Сбросить все данные'),
-                 subtitle: const Text('Удалить все настройки и историю'),
-                 onTap: _resetData,
-               ),
-             ],
-           ),
-          
+
+          // Pro функции (будут добавлены в следующих версиях)
+          // _buildProSection(),
+          const SizedBox(height: 24),
+
+          // Отзывы и рейтинг
+          _buildSection(
+            title: 'Отзывы и рейтинг',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.star, color: Colors.amber),
+                title: const Text('Оценить приложение'),
+                subtitle: const Text('Оставьте отзыв в RuStore'),
+                onTap: _requestReview,
+              ),
+              ListTile(
+                leading: const Icon(Icons.info, color: Colors.blue),
+                title: const Text('Статистика отзывов'),
+                subtitle: const Text('Показать информацию о запросах'),
+                onTap: _showReviewStats,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Опасная зона
+          _buildSection(
+            title: 'Опасная зона',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text('Сбросить все данные'),
+                subtitle: const Text('Удалить все настройки и историю'),
+                onTap: _resetData,
+              ),
+            ],
+          ),
+
           const SizedBox(height: 32),
-          
+
           ElevatedButton(
             onPressed: _saveSettings,
             style: ElevatedButton.styleFrom(
-              backgroundColor: kBlue,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               minimumSize: const Size(double.infinity, 48),
             ),
@@ -438,7 +603,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: kBlue,
+            color: AppColors.primary,
           ),
         ),
         const SizedBox(height: 12),
@@ -446,5 +611,4 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ],
     );
   }
-
 }

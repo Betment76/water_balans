@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_settings.dart';
 import '../models/water_intake.dart';
@@ -15,14 +17,40 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     final jsonStr = jsonEncode(settings.toJson());
     await prefs.setString(_userSettingsKey, jsonStr);
+
+    // Сохраняем также в файл для разработки
+    await _saveBackupToFile('user_settings_backup.json', settings.toJson());
+    print('Настройки пользователя сохранены в SharedPreferences и файл');
   }
 
   /// Загрузить настройки пользователя
   static Future<UserSettings?> loadUserSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final jsonStr = prefs.getString(_userSettingsKey);
-    if (jsonStr == null) return null;
-    return UserSettings.fromJson(jsonDecode(jsonStr));
+
+    if (jsonStr != null) {
+      print('Настройки пользователя загружены из SharedPreferences: $jsonStr');
+      return UserSettings.fromJson(jsonDecode(jsonStr));
+    }
+
+    // Если в SharedPreferences нет данных, проверяем резервный файл
+    print(
+      'Настройки пользователя не найдены в SharedPreferences, проверяем резервный файл...',
+    );
+    final backupData = await _loadBackupFromFile('user_settings_backup.json');
+
+    if (backupData != null) {
+      print('Настройки восстановлены из резервного файла!');
+      final settings = UserSettings.fromJson(backupData);
+      // Сохраняем обратно в SharedPreferences
+      await saveUserSettings(settings);
+      return settings;
+    }
+
+    print(
+      'Настройки пользователя не найдены ни в SharedPreferences, ни в резервном файле',
+    );
+    return null;
   }
 
   /// Сохранить историю воды
@@ -30,15 +58,40 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     final jsonList = list.map((e) => e.toJson()).toList();
     await prefs.setString(_waterIntakesKey, jsonEncode(jsonList));
+
+    // Сохраняем также в файл для разработки
+    await _saveBackupToFile('water_intakes_backup.json', {'intakes': jsonList});
+    print('История воды сохранена в SharedPreferences и файл');
   }
 
   /// Загрузить историю воды
   static Future<List<WaterIntake>> loadWaterIntakes() async {
     final prefs = await SharedPreferences.getInstance();
     final jsonStr = prefs.getString(_waterIntakesKey);
-    if (jsonStr == null) return [];
-    final List<dynamic> jsonList = jsonDecode(jsonStr);
-    return jsonList.map((e) => WaterIntake.fromJson(e)).toList();
+
+    if (jsonStr != null) {
+      print('История воды загружена из SharedPreferences');
+      final List<dynamic> jsonList = jsonDecode(jsonStr);
+      return jsonList.map((e) => WaterIntake.fromJson(e)).toList();
+    }
+
+    // Если в SharedPreferences нет данных, проверяем резервный файл
+    print(
+      'История воды не найдена в SharedPreferences, проверяем резервный файл...',
+    );
+    final backupData = await _loadBackupFromFile('water_intakes_backup.json');
+
+    if (backupData != null && backupData['intakes'] != null) {
+      print('История воды восстановлена из резервного файла!');
+      final List<dynamic> jsonList = backupData['intakes'];
+      final intakes = jsonList.map((e) => WaterIntake.fromJson(e)).toList();
+      // Сохраняем обратно в SharedPreferences
+      await saveWaterIntakes(intakes);
+      return intakes;
+    }
+
+    print('История воды не найдена');
+    return [];
   }
 
   /// Проверить первый запуск
@@ -70,10 +123,10 @@ class StorageService {
     final allIntakes = await loadWaterIntakes();
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    
+
     return allIntakes.where((intake) {
-      return intake.dateTime.isAfter(startOfDay) && 
-             intake.dateTime.isBefore(endOfDay);
+      return intake.dateTime.isAfter(startOfDay) &&
+          intake.dateTime.isBefore(endOfDay);
     }).toList();
   }
 
@@ -81,7 +134,7 @@ class StorageService {
   static Future<void> updateWaterIntake(WaterIntake intake) async {
     final allIntakes = await loadWaterIntakes();
     final index = allIntakes.indexWhere((item) => item.id == intake.id);
-    
+
     if (index != -1) {
       allIntakes[index] = intake;
       await saveWaterIntakes(allIntakes);
@@ -100,4 +153,67 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }
-} 
+
+  /// Показать все сохраненные ключи (для отладки)
+  static Future<void> debugShowAllKeys() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys();
+    print('Все сохраненные ключи: $keys');
+    for (final key in keys) {
+      final value = prefs.get(key);
+      print('$key: $value');
+    }
+  }
+
+  /// Получить путь к файлу резервной копии настроек
+  static Future<File> _getBackupFile(String filename) async {
+    // Пробуем использовать внешнее хранилище, которое не очищается при переустановке
+    try {
+      final directory = await getExternalStorageDirectory();
+      if (directory != null) {
+        final backupDir = Directory('${directory.path}/water_balance_backup');
+        if (!await backupDir.exists()) {
+          await backupDir.create(recursive: true);
+        }
+        return File('${backupDir.path}/$filename');
+      }
+    } catch (e) {
+      print('Ошибка доступа к внешнему хранилищу: $e');
+    }
+
+    // Fallback к Documents директории
+    final directory = await getApplicationDocumentsDirectory();
+    return File('${directory.path}/$filename');
+  }
+
+  /// Сохранить данные в файл как резервную копию
+  static Future<void> _saveBackupToFile(
+    String filename,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final file = await _getBackupFile(filename);
+      await file.writeAsString(jsonEncode(data));
+      print('Резервная копия сохранена: ${file.path}');
+    } catch (e) {
+      print('Ошибка сохранения резервной копии: $e');
+    }
+  }
+
+  /// Загрузить данные из файла резервной копии
+  static Future<Map<String, dynamic>?> _loadBackupFromFile(
+    String filename,
+  ) async {
+    try {
+      final file = await _getBackupFile(filename);
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        print('Резервная копия найдена: ${file.path}');
+        return jsonDecode(content);
+      }
+    } catch (e) {
+      print('Ошибка загрузки резервной копии: $e');
+    }
+    return null;
+  }
+}

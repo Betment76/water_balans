@@ -1,5 +1,3 @@
-
-
 /// Модель для хранения пользовательских настроек
 class UserSettings {
   /// Вес пользователя (кг)
@@ -29,6 +27,12 @@ class UserSettings {
   /// Единицы измерения (мл, л, oz)
   final String unit;
 
+  /// Включены ли автоматические запросы отзывов
+  final bool isReviewRequestEnabled;
+
+  /// Порог выполнения дневной нормы для показа отзыва (0.0-1.0)
+  final double reviewThresholdPercentage;
+
   /// Конструктор с валидацией
   UserSettings({
     required this.weight,
@@ -38,8 +42,10 @@ class UserSettings {
     required this.isWeatherEnabled,
     required this.notificationIntervalHours,
     this.notificationStartHour = 8, // Значение по умолчанию
-    this.notificationEndHour = 22,   // Значение по умолчанию
+    this.notificationEndHour = 22, // Значение по умолчанию
     this.unit = 'мл',
+    this.isReviewRequestEnabled = true, // По умолчанию включено
+    this.reviewThresholdPercentage = 0.75, // 75% от нормы
   }) {
     // Валидация веса
     if (weight < 30 || weight > 200) {
@@ -59,7 +65,9 @@ class UserSettings {
     }
     // Валидация интервала уведомлений
     if (notificationIntervalHours < 0 || notificationIntervalHours > 6) {
-      throw ArgumentError('notificationIntervalHours должен быть в диапазоне 0-6');
+      throw ArgumentError(
+        'notificationIntervalHours должен быть в диапазоне 0-6',
+      );
     }
     // Валидация часа начала уведомлений
     if (notificationStartHour < 0 || notificationStartHour > 23) {
@@ -72,6 +80,12 @@ class UserSettings {
     // Валидация единиц измерения
     if (!['мл', 'л', 'oz'].contains(unit)) {
       throw ArgumentError('unit должен быть мл, л или oz');
+    }
+    // Валидация порога отзыва
+    if (reviewThresholdPercentage < 0.0 || reviewThresholdPercentage > 1.0) {
+      throw ArgumentError(
+        'reviewThresholdPercentage должен быть в диапазоне 0.0-1.0',
+      );
     }
   }
 
@@ -86,6 +100,8 @@ class UserSettings {
     int? notificationStartHour,
     int? notificationEndHour,
     String? unit,
+    bool? isReviewRequestEnabled,
+    double? reviewThresholdPercentage,
   }) {
     return UserSettings(
       weight: weight ?? this.weight,
@@ -93,10 +109,16 @@ class UserSettings {
       activityLevel: activityLevel ?? this.activityLevel,
       dailyNormML: dailyNormML ?? this.dailyNormML,
       isWeatherEnabled: isWeatherEnabled ?? this.isWeatherEnabled,
-      notificationIntervalHours: notificationIntervalHours ?? this.notificationIntervalHours,
-      notificationStartHour: notificationStartHour ?? this.notificationStartHour,
+      notificationIntervalHours:
+          notificationIntervalHours ?? this.notificationIntervalHours,
+      notificationStartHour:
+          notificationStartHour ?? this.notificationStartHour,
       notificationEndHour: notificationEndHour ?? this.notificationEndHour,
       unit: unit ?? this.unit,
+      isReviewRequestEnabled:
+          isReviewRequestEnabled ?? this.isReviewRequestEnabled,
+      reviewThresholdPercentage:
+          reviewThresholdPercentage ?? this.reviewThresholdPercentage,
     );
   }
 
@@ -112,6 +134,8 @@ class UserSettings {
       'notificationStartHour': notificationStartHour,
       'notificationEndHour': notificationEndHour,
       'unit': unit,
+      'isReviewRequestEnabled': isReviewRequestEnabled,
+      'reviewThresholdPercentage': reviewThresholdPercentage,
     };
   }
 
@@ -126,6 +150,8 @@ class UserSettings {
     'notificationStartHour': notificationStartHour,
     'notificationEndHour': notificationEndHour,
     'unit': unit,
+    'isReviewRequestEnabled': isReviewRequestEnabled,
+    'reviewThresholdPercentage': reviewThresholdPercentage,
   };
 
   /// Создание из JSON
@@ -137,9 +163,14 @@ class UserSettings {
       dailyNormML: json['dailyNormML'] as int,
       isWeatherEnabled: json['isWeatherEnabled'] as bool,
       notificationIntervalHours: json['notificationIntervalHours'] as int,
-      notificationStartHour: json['notificationStartHour'] as int? ?? 8, // Значение по умолчанию
-      notificationEndHour: json['notificationEndHour'] as int? ?? 22,   // Значение по умолчанию
+      notificationStartHour:
+          json['notificationStartHour'] as int? ?? 8, // Значение по умолчанию
+      notificationEndHour:
+          json['notificationEndHour'] as int? ?? 22, // Значение по умолчанию
       unit: json['unit'] as String,
+      isReviewRequestEnabled: json['isReviewRequestEnabled'] as bool? ?? true,
+      reviewThresholdPercentage:
+          json['reviewThresholdPercentage'] as double? ?? 0.75,
     );
   }
 }
