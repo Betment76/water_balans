@@ -24,27 +24,27 @@ class AboutScreen extends StatelessWidget {
         children: [
           // Логотип и название
           _buildHeader(),
-          
+
           const SizedBox(height: 32),
-          
+
           // Информация о приложении
           _buildAppInfo(),
-          
+
           const SizedBox(height: 24),
-          
+
           // Разработчик
           _buildDeveloperInfo(),
-          
+
           const SizedBox(height: 24),
-          
+
           // Контакты
           _buildContactInfo(),
-          
+
           const SizedBox(height: 24),
-          
+
           // Политика конфиденциальности
           _buildPrivacyPolicy(),
-          
+
           const SizedBox(height: 32),
         ],
       ),
@@ -69,11 +69,7 @@ class AboutScreen extends StatelessWidget {
               ),
             ],
           ),
-          child: const Icon(
-            Icons.water_drop,
-            size: 60,
-            color: Colors.white,
-          ),
+          child: const Icon(Icons.water_drop, size: 60, color: Colors.white),
         ),
         const SizedBox(height: 16),
         const Text(
@@ -86,11 +82,8 @@ class AboutScreen extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Версия 1.0.0',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey,
-          ),
+          'Версия 1.1.0',
+          style: TextStyle(fontSize: 16, color: Colors.grey),
         ),
       ],
     );
@@ -101,9 +94,7 @@ class AboutScreen extends StatelessWidget {
     return Card(
       color: const Color(0xFFE3F2FD), // Светло-голубой цвет
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -118,13 +109,13 @@ class AboutScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            _buildInfoRow('Версия', '1.0.0'),
+            _buildInfoRow('Версия', '1.1.0'),
             _buildInfoRow('Платформа', 'Android'),
             _buildInfoRow('Языки', 'Русский, Английский'),
             _buildInfoRow('Размер', '~15 MB'),
             const SizedBox(height: 12),
             const Text(
-              'Приложение для отслеживания потребления воды с интерактивным интерфейсом и умными напоминаниями.',
+              'Приложение для отслеживания потребления воды с интерактивным интерфейсом, умными напоминаниями и интеграцией рекламных баннеров.',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
@@ -142,9 +133,7 @@ class AboutScreen extends StatelessWidget {
     return Card(
       color: const Color(0xFFE3F2FD), // Светло-голубой цвет
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -168,11 +157,7 @@ class AboutScreen extends StatelessWidget {
                     color: kBlue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(25),
                   ),
-                  child: const Icon(
-                    Icons.person,
-                    color: kBlue,
-                    size: 30,
-                  ),
+                  child: const Icon(Icons.person, color: kBlue, size: 30),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
@@ -188,10 +173,7 @@ class AboutScreen extends StatelessWidget {
                       ),
                       Text(
                         'Flutter разработчик',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -209,9 +191,7 @@ class AboutScreen extends StatelessWidget {
     return Card(
       color: const Color(0xFFE3F2FD), // Светло-голубой цвет
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -244,7 +224,9 @@ class AboutScreen extends StatelessWidget {
               Icons.lightbulb,
               'Предложить идею',
               'Отправить предложение',
-              () => _launchEmail(subject: 'Предложение для приложения Водный баланс'),
+              () => _launchEmail(
+                subject: 'Предложение для приложения Водный баланс',
+              ),
             ),
           ],
         ),
@@ -257,9 +239,7 @@ class AboutScreen extends StatelessWidget {
     return Card(
       color: const Color(0xFFE3F2FD), // Светло-голубой цвет
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -279,9 +259,15 @@ class AboutScreen extends StatelessWidget {
               style: TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 8),
-            _buildPrivacyPoint('• Все данные хранятся локально на вашем устройстве'),
-            _buildPrivacyPoint('• Мы не собираем и не передаем личную информацию'),
-            _buildPrivacyPoint('• Приложение работает без интернета, интернет нужен для данных о погоде'),
+            _buildPrivacyPoint(
+              '• Все данные хранятся локально на вашем устройстве',
+            ),
+            _buildPrivacyPoint(
+              '• Мы не собираем и не передаем личную информацию',
+            ),
+            _buildPrivacyPoint(
+              '• Приложение работает без интернета, интернет нужен для данных о погоде',
+            ),
             _buildPrivacyPoint('• Уведомления настраиваются только локально'),
             const SizedBox(height: 12),
             const Text(
@@ -305,19 +291,10 @@ class AboutScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
-            ),
-          ),
+          Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -325,7 +302,12 @@ class AboutScreen extends StatelessWidget {
   }
 
   /// Строка контакта
-  Widget _buildContactRow(IconData icon, String label, String value, VoidCallback onTap) {
+  Widget _buildContactRow(
+    IconData icon,
+    String label,
+    String value,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -333,11 +315,7 @@ class AboutScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: kBlue,
-              size: 20,
-            ),
+            Icon(icon, color: kBlue, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -352,19 +330,12 @@ class AboutScreen extends StatelessWidget {
                   ),
                   Text(
                     value,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),
             ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Colors.grey,
-            ),
+            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
           ],
         ),
       ),
@@ -375,10 +346,7 @@ class AboutScreen extends StatelessWidget {
   Widget _buildPrivacyPoint(String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 13),
-      ),
+      child: Text(text, style: const TextStyle(fontSize: 13)),
     );
   }
 
@@ -389,9 +357,9 @@ class AboutScreen extends StatelessWidget {
       path: 'svitalich76@mail.ru',
       query: subject.isNotEmpty ? 'subject=$subject' : null,
     );
-    
+
     if (await canLaunchUrl(emailUri)) {
       await launchUrl(emailUri);
     }
   }
-} 
+}
