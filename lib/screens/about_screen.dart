@@ -5,8 +5,18 @@ import '../constants/app_colors.dart';
 const Color kBlue = Color(0xFF1976D2);
 
 /// Экран "О приложении"
-class AboutScreen extends StatelessWidget {
+class AboutScreen extends StatefulWidget {
   const AboutScreen({Key? key}) : super(key: key);
+
+  @override
+  State<AboutScreen> createState() => _AboutScreenState();
+}
+
+class _AboutScreenState extends State<AboutScreen> {
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,11 +36,6 @@ class AboutScreen extends StatelessWidget {
           _buildHeader(),
 
           const SizedBox(height: 32),
-
-          // Информация о приложении
-          _buildAppInfo(),
-
-          const SizedBox(height: 24),
 
           // Разработчик
           _buildDeveloperInfo(),
@@ -86,45 +91,6 @@ class AboutScreen extends StatelessWidget {
           style: TextStyle(fontSize: 16, color: Colors.grey),
         ),
       ],
-    );
-  }
-
-  /// Информация о приложении
-  Widget _buildAppInfo() {
-    return Card(
-      color: const Color(0xFFE3F2FD), // Светло-голубой цвет
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'О приложении',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: kBlue,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildInfoRow('Версия', '1.1.0'),
-            _buildInfoRow('Платформа', 'Android'),
-            _buildInfoRow('Языки', 'Русский, Английский'),
-            _buildInfoRow('Размер', '~15 MB'),
-            const SizedBox(height: 12),
-            const Text(
-              'Приложение для отслеживания потребления воды с интерактивным интерфейсом, умными напоминаниями и интеграцией рекламных баннеров.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

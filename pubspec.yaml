@@ -51,7 +51,7 @@ dependencies:
   http: ^1.5.0
   flutter_timezone: ^4.1.1
   flutter_rustore_review: ^7.0.0 # RuStore SDK для отзывов и рейтингов
-  path_provider: ^2.1.4 # Для доступа к директориям приложения
+  flutter_rustore_pay: ^10.0.0 # Новый RuStore Pay SDK для платежей
 
 dev_dependencies:
   flutter_test:

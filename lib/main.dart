@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:water_balance/l10n/app_localizations.dart';
-import 'package:water_balance/l10n/l10n.dart';
+import 'l10n/app_localizations.dart';
+import 'l10n/l10n.dart'; // Добавлено для использования L10n
+import 'services/rustore_pay_service.dart';
 import 'constants/app_colors.dart';
 import 'constants/app_strings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +25,9 @@ void main() async {
   await NotificationService.initialize();
   await RuStoreReviewService.initialize();
   await MyTargetAdService.initialize();
+  // await RustoreBillingService.initialize(); // Удалено, так как используем новый RuStore Pay SDK
+  // Инициализация RuStore Pay SDK
+  await RustorePayService.initialize();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   runApp(const ProviderScope(child: WaterBalanceApp()));
 }

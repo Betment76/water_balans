@@ -7,6 +7,8 @@ import '../services/weather_service.dart';
 import '../services/notification_service.dart';
 import '../services/calculation_service.dart';
 import '../services/rustore_review_service.dart';
+import '../services/rustore_pay_service.dart';
+// import '../services/test_rustore_billing.dart'; // Удалено для релиза
 import '../constants/app_colors.dart';
 import 'main_navigation_screen.dart';
 
@@ -26,6 +28,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   int activityLevel = 1;
   String selectedUnit = 'мл';
   bool _isProUser = false;
+  bool _isAdFree = false;
 
   String? _weightError;
   String? _heightError;
@@ -38,6 +41,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.initState();
     _loadSettings();
     _checkProStatus();
+    _checkAdFreeStatus();
     _fetchWeather();
 
     weightController.addListener(_updateDailyNorm);
@@ -71,6 +75,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() {
       _isProUser = isPro;
     });
+  }
+
+  Future<void> _checkAdFreeStatus() async {
+    try {
+      final isAdFree = await RustorePayService.isAdFree();
+      setState(() {
+        _isAdFree = isAdFree;
+      });
+    } catch (e) {
+      print('Ошибка проверки статуса без рекламы: $e');
+    }
   }
 
   Future<void> _fetchWeather() async {
@@ -293,6 +308,82 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SnackBar(
             content: Text('Ошибка получения статистики: $e'),
             backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Покупка отключения рекламы
+  Future<void> _purchaseRemoveAds() async {
+    try {
+      final success = await RustorePayService.purchaseRemoveAds();
+      if (mounted) {
+        String message;
+        Color backgroundColor;
+
+        if (success) {
+          await _checkAdFreeStatus(); // Обновляем статус
+          message = 'Покупка успешно завершена! Реклама отключена.';
+          backgroundColor = Colors.green;
+        } else {
+          message = 'Покупка не удалась. Попробуйте позже.';
+          backgroundColor = Colors.red;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: backgroundColor,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка покупки: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Восстановление покупок
+  Future<void> _restorePurchases() async {
+    try {
+      await RustorePayService.restorePurchases();
+      if (mounted) {
+        final isAdFree = await RustorePayService.isAdFree();
+        String message;
+        Color backgroundColor;
+
+        if (isAdFree) {
+          message = 'Покупки успешно восстановлены! Реклама отключена.';
+          backgroundColor = Colors.green;
+        } else {
+          message = 'Активные покупки не найдены.';
+          backgroundColor = Colors.orange;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: backgroundColor,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка восстановления: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -541,6 +632,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // _buildProSection(),
           const SizedBox(height: 24),
 
+          // RuStore billing
+          _buildSection(
+            title: 'Покупки RuStore',
+            children: [
+              ListTile(
+                leading: Icon(
+                  _isAdFree ? Icons.check_circle : Icons.shopping_cart,
+                  color: _isAdFree ? Colors.green : Colors.orange,
+                ),
+                title: const Text('Статус без рекламы'),
+                subtitle: Text(
+                  _isAdFree ? 'Реклама отключена' : 'Реклама включена',
+                ),
+                trailing: _isAdFree
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : null,
+              ),
+              ListTile(
+                leading: const Icon(Icons.payment, color: Colors.blue),
+                title: const Text('Отключить рекламу'),
+                subtitle: const Text('Покупка одноразовая'),
+                onTap: _isAdFree ? null : _purchaseRemoveAds,
+              ),
+              ListTile(
+                leading: const Icon(Icons.restore, color: Colors.purple),
+                title: const Text('Восстановить покупки'),
+                subtitle: const Text('Проверить существующие покупки'),
+                onTap: _restorePurchases,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+
           // Отзывы и рейтинг
           _buildSection(
             title: 'Отзывы и рейтинг',
@@ -560,7 +685,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
           // Опасная зона
           _buildSection(

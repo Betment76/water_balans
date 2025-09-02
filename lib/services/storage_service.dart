@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
+// import 'package:path_provider/path_provider.dart'; // Временно отключаем из-за проблем с репозиторием
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_settings.dart';
 import '../models/water_intake.dart';
@@ -18,9 +18,9 @@ class StorageService {
     final jsonStr = jsonEncode(settings.toJson());
     await prefs.setString(_userSettingsKey, jsonStr);
 
-    // Сохраняем также в файл для разработки
-    await _saveBackupToFile('user_settings_backup.json', settings.toJson());
-    print('Настройки пользователя сохранены в SharedPreferences и файл');
+    // Временно отключаем сохранение в файл из-за проблем с path_provider
+    // await _saveBackupToFile('user_settings_backup.json', settings.toJson());
+    print('Настройки пользователя сохранены в SharedPreferences');
   }
 
   /// Загрузить настройки пользователя
@@ -33,6 +33,8 @@ class StorageService {
       return UserSettings.fromJson(jsonDecode(jsonStr));
     }
 
+    // Временно отключаем загрузку из файла из-за проблем с path_provider
+    /*
     // Если в SharedPreferences нет данных, проверяем резервный файл
     print(
       'Настройки пользователя не найдены в SharedPreferences, проверяем резервный файл...',
@@ -46,10 +48,9 @@ class StorageService {
       await saveUserSettings(settings);
       return settings;
     }
+    */
 
-    print(
-      'Настройки пользователя не найдены ни в SharedPreferences, ни в резервном файле',
-    );
+    print('Настройки пользователя не найдены в SharedPreferences');
     return null;
   }
 
@@ -59,9 +60,9 @@ class StorageService {
     final jsonList = list.map((e) => e.toJson()).toList();
     await prefs.setString(_waterIntakesKey, jsonEncode(jsonList));
 
-    // Сохраняем также в файл для разработки
-    await _saveBackupToFile('water_intakes_backup.json', {'intakes': jsonList});
-    print('История воды сохранена в SharedPreferences и файл');
+    // Временно отключаем сохранение в файл из-за проблем с path_provider
+    // await _saveBackupToFile('water_intakes_backup.json', {'intakes': jsonList});
+    print('История воды сохранена в SharedPreferences');
   }
 
   /// Загрузить историю воды
@@ -75,6 +76,8 @@ class StorageService {
       return jsonList.map((e) => WaterIntake.fromJson(e)).toList();
     }
 
+    // Временно отключаем загрузку из файла из-за проблем с path_provider
+    /*
     // Если в SharedPreferences нет данных, проверяем резервный файл
     print(
       'История воды не найдена в SharedPreferences, проверяем резервный файл...',
@@ -89,6 +92,7 @@ class StorageService {
       await saveWaterIntakes(intakes);
       return intakes;
     }
+    */
 
     print('История воды не найдена');
     return [];
@@ -165,6 +169,7 @@ class StorageService {
     }
   }
 
+  /*
   /// Получить путь к файлу резервной копии настроек
   static Future<File> _getBackupFile(String filename) async {
     // Пробуем использовать внешнее хранилище, которое не очищается при переустановке
@@ -216,4 +221,5 @@ class StorageService {
     }
     return null;
   }
+  */
 }

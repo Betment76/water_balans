@@ -32,6 +32,21 @@ class MyTargetAdService {
     }
   }
 
+  /// Показать баннер точно под AppBar
+  static Future<void> showBannerUnderAppBar(int slotId) async {
+    try {
+      await _channel.invokeMethod('showBanner', {
+        'slotId': slotId,
+        'width': 320,
+        'height': 50,
+        'position': 'under_appbar', // Специальный флаг для позиционирования
+      });
+      print('MyTarget баннер показан под AppBar: slotId=$slotId');
+    } catch (e) {
+      print('Ошибка показа баннера под AppBar: $e');
+    }
+  }
+
   /// Скрыть баннер
   static Future<void> hideBanner() async {
     try {

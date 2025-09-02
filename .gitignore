@@ -103,3 +103,6 @@ key.properties
 
 # Local config with API keys
 lib/constants/config.dart
+
+# RuStore billing config
+lib/constants/rustore_config.dart

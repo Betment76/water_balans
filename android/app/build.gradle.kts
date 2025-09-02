@@ -60,4 +60,7 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     // MyTarget SDK для рекламы (обновленная версия)
     implementation("com.my.target:mytarget-sdk:5.27.2")
+    // RuStore Pay SDK
+    implementation(platform("ru.rustore.sdk:bom:2025.08.01"))
+    implementation("ru.rustore.sdk:pay")
 }

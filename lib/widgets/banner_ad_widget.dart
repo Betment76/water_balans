@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/rustore_pay_service.dart';
 import '../services/mytarget_ad_service.dart';
 
 /// Виджет для показа рекламного баннера MyTarget 320x50
@@ -20,6 +21,23 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   @override
   void initState() {
     super.initState();
+    _checkAdFreeStatusAndLoadAd();
+  }
+
+  Future<void> _checkAdFreeStatusAndLoadAd() async {
+    // Проверяем, куплено ли отключение рекламы
+    final isAdFree = await RustorePayService.isAdFree();
+
+    if (isAdFree) {
+      // Если реклама отключена, не показываем баннер
+      setState(() {
+        _isLoading = false;
+        _isAdLoaded = false;
+      });
+      return;
+    }
+
+    // Если реклама не отключена, загружаем баннер
     _loadAd();
   }
 
@@ -34,8 +52,8 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
       final isAvailable = await MyTargetAdService.isAdAvailable();
 
       if (isAvailable && mounted) {
-        // Показываем баннер с нашим ID
-        await MyTargetAdService.showBanner(_bannerId);
+        // Показываем баннер точно под AppBar
+        await MyTargetAdService.showBannerUnderAppBar(_bannerId);
 
         setState(() {
           _isAdLoaded = true;
@@ -67,70 +85,62 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      // Показываем индикатор загрузки
-      return Container(
-        width: 320,
-        height: 50,
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Center(
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Colors.blue,
+    return FutureBuilder<bool>(
+      future: RustorePayService.isAdFree(),
+      builder: (context, snapshot) {
+        final isAdFree = snapshot.data ?? false;
+
+        // Если реклама отключена, не показываем баннер
+        if (isAdFree) {
+          return const SizedBox.shrink();
+        }
+
+        if (_isLoading) {
+          // Показываем индикатор загрузки без рамки
+          return Container(
+            width: 320,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
             ),
-          ),
-        ),
-      );
-    }
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.blue,
+                ),
+              ),
+            ),
+          );
+        }
 
-    if (_errorMessage != null || !_isAdLoaded) {
-      // Показываем заглушку при ошибке или если реклама недоступна
-      return Container(
-        width: 320,
-        height: 50,
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          border: Border.all(color: Colors.grey[300]!, width: 1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(
-          child: Text(
-            _errorMessage ?? 'Реклама недоступна',
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
+        if (_errorMessage != null || !_isAdLoaded) {
+          // Показываем заглушку при ошибке без рамки
+          return Container(
+            width: 320,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              border: Border.all(color: Colors.grey[300]!, width: 1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                _errorMessage ?? 'Реклама недоступна',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
 
-    // Контейнер для MyTarget баннера (ID: 1895039)
-    // Реальный баннер будет отображаться через нативный код Android
-    return Container(
-      width: 320,
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: const Center(
-        child: Text(
-          'MyTarget Banner (ID: 1895039)',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-      ),
+        // Когда реальный MyTarget баннер загружен, не показываем Flutter поле
+        // Реальный баннер отображается через нативный Android код
+        return const SizedBox.shrink();
+      },
     );
   }
 }

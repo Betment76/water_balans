@@ -9,6 +9,7 @@ import com.my.target.common.models.IAdLoadingError
 import android.widget.FrameLayout
 import android.view.Gravity
 import android.util.Log
+import android.content.Intent
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "mytarget_ads"
@@ -26,7 +27,8 @@ class MainActivity : FlutterActivity() {
                 }
                 "showBanner" -> {
                     val slotId = call.argument<Int>("slotId") ?: 0
-                    showBanner(slotId)
+                    val position = call.argument<String>("position") ?: "default"
+                    showBanner(slotId, position)
                     result.success(null)
                 }
                 "hideBanner" -> {
@@ -50,7 +52,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun showBanner(slotId: Int) {
+    private fun showBanner(slotId: Int, position: String) {
         try {
             runOnUiThread {
                 // Создаем баннер
@@ -61,7 +63,7 @@ class MainActivity : FlutterActivity() {
                     // Обработчики событий
                     listener = object : MyTargetViewListener {
                         override fun onLoad(myTargetView: MyTargetView) {
-                            Log.d("MyTarget", "Баннер успешно загружен: slotId=$slotId")
+                            Log.d("MyTarget", "Баннер успешно загружен: slotId=$slotId, position=$position")
                         }
 
                         override fun onNoAd(error: IAdLoadingError, myTargetView: MyTargetView) {
@@ -80,8 +82,8 @@ class MainActivity : FlutterActivity() {
                     }
                 }
 
-                // Добавляем баннер на экран (вверху)
-                addBannerToScreen()
+                // Добавляем баннер на экран с учетом позиции
+                addBannerToScreen(position)
                 
                 // Загружаем рекламу
                 bannerView?.load()
@@ -91,15 +93,53 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun addBannerToScreen() {
+    private fun addBannerToScreen(position: String) {
         bannerContainer = FrameLayout(this).apply {
             val layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                // Размещаем баннер вверху по центру
                 gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                topMargin = 100 // Отступ от верха под бар
+                
+                when (position) {
+                    "under_appbar" -> {
+                        // Получаем высоту статус бара
+                        val statusBarHeight = resources.getDimensionPixelSize(
+                            resources.getIdentifier("status_bar_height", "dimen", "android")
+                        )
+                        
+                        // Используем фиксированное значение для AppBar (56dp)
+                        val density = resources.displayMetrics.density
+                        val appBarHeight = (56 * density).toInt()
+                        
+                        // Размещаем баннер прямо под AppBar
+                        topMargin = statusBarHeight + appBarHeight + (8 * density).toInt() // добавляем небольшой отступ
+                        
+                        Log.d("BannerPosition", 
+                            "under_appbar - StatusBar: $statusBarHeight, AppBar: $appBarHeight, Total: $topMargin")
+                    }
+                    "top" -> {
+                        // Размещаем баннер в самом верху (под статус баром)
+                        val statusBarHeight = resources.getDimensionPixelSize(
+                            resources.getIdentifier("status_bar_height", "dimen", "android")
+                        )
+                        topMargin = statusBarHeight
+                        
+                        Log.d("BannerPosition", "top - StatusBar: $statusBarHeight")
+                    }
+                    else -> {
+                        // Дефолтная позиция - под AppBar
+                        val statusBarHeight = resources.getDimensionPixelSize(
+                            resources.getIdentifier("status_bar_height", "dimen", "android")
+                        )
+                        val density = resources.displayMetrics.density
+                        val appBarHeight = (56 * density).toInt()
+                        topMargin = statusBarHeight + appBarHeight
+                        
+                        Log.d("BannerPosition", 
+                            "default - StatusBar: $statusBarHeight, AppBar: $appBarHeight, Total: $topMargin")
+                    }
+                }
             }
             
             bannerView?.let { addView(it, layoutParams) }

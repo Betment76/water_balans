@@ -191,7 +191,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       body: Column(
         children: [
-          // Рекламный баннер MyTarget 320x50 под верхним баром (ID: 1895039)
+          // Место под нативный баннер MyTarget (320x50)
+          const SizedBox(height: 60), // Высота баннера + отступы
+          // Рекламный баннер MyTarget 320x50 прямо под синей полосой (ID: 1895039)
           const Center(child: BannerAdWidget()),
           const SizedBox(height: 10),
           Expanded(
