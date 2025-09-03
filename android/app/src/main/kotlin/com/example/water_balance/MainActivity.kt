@@ -43,6 +43,14 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    // Добавлена обработка onNewIntent для RuStore Pay SDK
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Обработка deep links от RuStore Pay SDK
+        // Это необходимо для корректной работы с различными платежными методами
+        // включая СБП, Сбер и Т-Банк
+    }
+
     private fun initializeMyTarget() {
         try {
             // Инициализация MyTarget SDK
