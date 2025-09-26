@@ -5,6 +5,7 @@
     "cmake.sourceDirectory": "F:/Programs/AndroidStudioProject/water_balance/linux",
     "trae.tab.enableRename": false,
     "trae.tab.enableAutoImport": false,
-    "CodeGPT.apiKey": "Ollama"
+    "CodeGPT.apiKey": "Ollama",
+    "java.configuration.updateBuildConfiguration": "interactive"
    
 }

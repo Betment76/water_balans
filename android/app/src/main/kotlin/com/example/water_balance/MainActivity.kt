@@ -10,11 +10,28 @@ import android.widget.FrameLayout
 import android.view.Gravity
 import android.util.Log
 import android.content.Intent
+import android.os.Bundle
+import ru.rustore.sdk.pay.RuStorePayClient
+import ru.rustore.sdk.pay.IntentInteractor
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "mytarget_ads"
     private var bannerView: MyTargetView? = null
     private var bannerContainer: FrameLayout? = null
+    
+    // RuStore Pay SDK IntentInteractor
+    private val intentInteractor: IntentInteractor by lazy {
+        RuStorePayClient.instance.getIntentInteractor()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // Обработка Intent для RuStore Pay SDK
+        if (savedInstanceState == null) {
+            intentInteractor.proceedIntent(intent)
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -43,12 +60,11 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    // Добавлена обработка onNewIntent для RuStore Pay SDK
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Обработка deep links от RuStore Pay SDK
-        // Это необходимо для корректной работы с различными платежными методами
-        // включая СБП, Сбер и Т-Банк
+        setIntent(intent)
+        // Обработка Intent для RuStore Pay SDK
+        intentInteractor.proceedIntent(intent)
     }
 
     private fun initializeMyTarget() {

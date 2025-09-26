@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- RuStore Pay SDK конфигурация -->
+    <string name="CONSOLE_APPLICATION_ID">2063647542</string>
+    <string name="SDK_PAY_SCHEME">waterbalance</string>
+    
+    <!-- Название приложения -->
+    <string name="app_name">Водный баланс</string>
+</resources>

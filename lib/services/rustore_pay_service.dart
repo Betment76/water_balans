@@ -17,8 +17,8 @@ import '../constants/rustore_config.dart';
 /// - Product ID: water_balance_remove_ads_premium_2024
 /// - Deep Link Scheme: com.example.water_balance.rustore://payment
 ///
-/// RuStore Pay SDK 10.0.0 АКТИВИРОВАН согласно документации:
-/// ✅ Зависимость flutter_rustore_pay: ^10.0.0 подключена
+/// RuStore Pay SDK 9.1.0 АКТИВИРОВАН согласно документации:
+/// ✅ Зависимость flutter_rustore_pay: ^9.1.0 подключена
 /// ✅ Deep link схема настроена в AndroidManifest.xml
 /// ✅ MainActivity.kt настроена для обработки deep links
 /// ✅ Товар создан в RuStore Console и опубликован
@@ -130,12 +130,10 @@ class RustorePayService {
       final result = await RuStorePayClient.instance.purchaseInteractor
           .purchase(_removeAdsProductId);
 
-      // Обработка результата покупки
+      // Обработка результата покупки согласно рабочей версии из проекта давление
       if (result.purchaseId != null) {
         await _saveAdFreeStatus(true);
-        print(
-          'Покупка отключения рекламы выполнена успешно. ID покупки: ${result.purchaseId}',
-        );
+        print('Покупка отключения рекламы выполнена успешно. ID покупки: ${result.purchaseId}');
         return true;
       } else {
         print('Ошибка покупки RuStore: Не удалось получить ID покупки');
@@ -182,7 +180,7 @@ class RustorePayService {
       // Проверяем, есть ли среди покупок наш продукт
       bool hasValidPurchase = false;
       for (var purchase in purchases) {
-        // Проверяем, является ли покупка ProductPurchase
+        // Проверяем, является ли покупка ProductPurchase (как в рабочем проекте)
         if (purchase is ProductPurchase &&
             purchase.productId == _removeAdsProductId) {
           hasValidPurchase = true;

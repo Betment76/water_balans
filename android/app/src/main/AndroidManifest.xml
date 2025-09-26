@@ -21,18 +21,22 @@
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
+        android:enableOnBackInvokedCallback="true"
         tools:replace="android:label">
-        <!-- Конфигурация RuStore Pay SDK -->
+        <!-- Конфигурация RuStore Pay SDK согласно документации 9.1.0 -->
         <meta-data
-            android:name="ru.rustore.sdk.console_app_id"
-            android:value="2063647542" />
+            android:name="console_app_id_value"
+            android:value="@string/CONSOLE_APPLICATION_ID" />
         <meta-data
-            android:name="ru.rustore.sdk.pay.scheme"
-            android:value="com.example.water_balance.rustore" />
+            android:name="sdk_pay_scheme_value"
+            android:value="@string/SDK_PAY_SCHEME" />
+        <meta-data
+            android:name="app_scheme_value"
+            android:value="@string/SDK_PAY_SCHEME" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
@@ -55,7 +59,7 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="com.example.water_balance.rustore"/>
+                <data android:scheme="@string/SDK_PAY_SCHEME"/>
             </intent-filter>
         </activity>
         <!-- MyTarget активность для рекламы -->
@@ -77,6 +81,43 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        
+        <!-- Запросы для банковских приложений (RuStore Pay SDK) -->
+        <!-- СБП - Система быстрых платежей -->
+        <package android:name="ru.nspk.c2bmobile" />
+        <package android:name="ru.nspk.c2bmobile.test" />
+        
+        <!-- SberPay -->
+        <package android:name="ru.sberbankmobile" />
+        <package android:name="ru.sberbankmobile.dev" />
+        
+        <!-- T-Pay (Tinkoff) -->
+        <package android:name="com.idamobile.tinkoff.android" />
+        <package android:name="com.tinkoff.payment.android" />
+        
+        <!-- Другие популярные банковские приложения -->
+        <package android:name="ru.alfabank.mobile.android" />
+        <package android:name="com.rbs.mobile.android" />
+        <package android:name="ru.vtb24.mobilebanking.android" />
+        <package android:name="ru.raiffeisen.client.android" />
+        
+        <!-- Intent для открытия банковских приложений через схемы -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="sbp"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="sberpay"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="tinkoff"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="alfabank"/>
         </intent>
     </queries>
 </manifest>
