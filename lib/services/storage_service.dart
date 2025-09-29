@@ -11,6 +11,11 @@ class StorageService {
   static const String _waterIntakesKey = 'water_intakes';
   static const String _isFirstLaunchKey = 'is_first_launch';
   static const String _isProUserKey = 'is_pro_user';
+  
+  // 🚀 КЭШИРОВАНИЕ для оптимизации производительности
+  static List<WaterIntake>? _cachedWaterIntakes;
+  static DateTime? _cacheTime;
+  static const Duration _cacheTimeout = Duration(minutes: 5); // Кэш на 5 минут
 
   /// Сохранить настройки пользователя
   static Future<void> saveUserSettings(UserSettings settings) async {
@@ -60,20 +65,40 @@ class StorageService {
     final jsonList = list.map((e) => e.toJson()).toList();
     await prefs.setString(_waterIntakesKey, jsonEncode(jsonList));
 
+    // 🚀 ОБНОВЛЯЕМ КЭШ при сохранении новых данных
+    _cachedWaterIntakes = List.from(list);
+    _cacheTime = DateTime.now();
+
     // Временно отключаем сохранение в файл из-за проблем с path_provider
     // await _saveBackupToFile('water_intakes_backup.json', {'intakes': jsonList});
     print('История воды сохранена в SharedPreferences');
   }
 
-  /// Загрузить историю воды
+  /// Загрузить историю воды (с кэшированием!)
   static Future<List<WaterIntake>> loadWaterIntakes() async {
+    // 🚀 ПРОВЕРЯЕМ КЭШ перед загрузкой из SharedPreferences
+    if (_cachedWaterIntakes != null && _cacheTime != null) {
+      final now = DateTime.now();
+      if (now.difference(_cacheTime!) < _cacheTimeout) {
+        print('📊 История воды загружена из КЭША (${_cachedWaterIntakes!.length} записей)');
+        return List.from(_cachedWaterIntakes!);
+      }
+    }
+
+    // 💾 Загружаем из SharedPreferences если кэш устарел или отсутствует
     final prefs = await SharedPreferences.getInstance();
     final jsonStr = prefs.getString(_waterIntakesKey);
 
     if (jsonStr != null) {
-      print('История воды загружена из SharedPreferences');
+      print('💾 История воды загружена из SharedPreferences');
       final List<dynamic> jsonList = jsonDecode(jsonStr);
-      return jsonList.map((e) => WaterIntake.fromJson(e)).toList();
+      final waterIntakes = jsonList.map((e) => WaterIntake.fromJson(e)).toList();
+      
+      // 🚀 СОХРАНЯЕМ В КЭШ
+      _cachedWaterIntakes = List.from(waterIntakes);
+      _cacheTime = DateTime.now();
+      
+      return waterIntakes;
     }
 
     // Временно отключаем загрузку из файла из-за проблем с path_provider
@@ -141,7 +166,7 @@ class StorageService {
 
     if (index != -1) {
       allIntakes[index] = intake;
-      await saveWaterIntakes(allIntakes);
+      await saveWaterIntakes(allIntakes); // Автоматически обновит кэш
     }
   }
 
@@ -149,13 +174,17 @@ class StorageService {
   static Future<void> deleteWaterIntake(String id) async {
     final allIntakes = await loadWaterIntakes();
     allIntakes.removeWhere((item) => item.id == id);
-    await saveWaterIntakes(allIntakes);
+    await saveWaterIntakes(allIntakes); // Автоматически обновит кэш
   }
 
   /// Очистить все данные приложения
   static Future<void> clearAllData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    
+    // 🚀 ОЧИЩАЕМ КЭШ при полной очистке
+    _cachedWaterIntakes = null;
+    _cacheTime = null;
   }
 
   /// Показать все сохраненные ключи (для отладки)

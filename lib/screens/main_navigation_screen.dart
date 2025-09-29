@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
-
-import 'history_screen.dart';
+import 'calendar_stats_screen.dart';
+import 'achievements_screen.dart';
 import 'reminders_screen.dart';
 import 'about_screen.dart';
-
 import 'settings_screen.dart';
+import '../services/mytarget_ad_service.dart';
 
 const Color kBlue = Color(0xFF1976D2); // синий для иконок
 const Color kLightBlue = Color(0xFF64B5F6); // голубой фон меню
@@ -20,11 +20,13 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  bool _bannerInitialized = false;
 
   // Список экранов
   final List<Widget> _screens = [
     const HomeScreen(),
-    const HistoryScreen(),
+    const CalendarStatsScreen(),
+    const AchievementsScreen(),
     const RemindersScreen(),
     const SettingsScreen(),
     const AboutScreen(),
@@ -32,6 +34,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 📺 ИНИЦИАЛИЗАЦИЯ глобального MyTarget баннера один раз
+    if (!_bannerInitialized) {
+      _bannerInitialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await MyTargetAdService.initialize();
+        await MyTargetAdService.showBannerUnderAppBar(1895039);
+        debugPrint('🎯 Глобальный MyTarget баннер инициализирован');
+      });
+    }
+
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
@@ -46,24 +58,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               onTap: () => setState(() => _currentIndex = 0),
             ),
             _NavIcon(
-              icon: Icons.history,
+              icon: Icons.analytics,
               selected: _currentIndex == 1,
               onTap: () => setState(() => _currentIndex = 1),
             ),
             _NavIcon(
-              icon: Icons.notifications,
+              icon: Icons.emoji_events,
               selected: _currentIndex == 2,
               onTap: () => setState(() => _currentIndex = 2),
             ),
             _NavIcon(
-              icon: Icons.settings,
+              icon: Icons.notifications,
               selected: _currentIndex == 3,
               onTap: () => setState(() => _currentIndex = 3),
             ),
             _NavIcon(
-              icon: Icons.info_outline,
+              icon: Icons.settings,
               selected: _currentIndex == 4,
               onTap: () => setState(() => _currentIndex = 4),
+            ),
+            _NavIcon(
+              icon: Icons.info_outline,
+              selected: _currentIndex == 5,
+              onTap: () => setState(() => _currentIndex = 5),
             ),
           ],
         ),

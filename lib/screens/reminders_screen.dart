@@ -81,26 +81,40 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
         foregroundColor: kWhite,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildMainSwitch(),
-            const SizedBox(height: 24),
-
-            if (_notificationsEnabled) ...[
-              _buildIntervalSection(),
-              const SizedBox(height: 24),
-
-              _buildTimeSection(),
-              const SizedBox(height: 24),
-
-              _buildInfoCard(),
-            ] else ...[
-              _buildDisabledMessage(),
+      // 📌 Фиксированная кнопка сохранения снизу
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _saveSettings, // сохраняем настройки
+        backgroundColor: kBlue,
+        icon: const Icon(Icons.save, color: kWhite),
+        label: const Text('Сохранить', style: TextStyle(color: kWhite)),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1976D2), Color(0xFF64B5F6), Colors.white],
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(top: 70, left: 16, right: 16, bottom: 96),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildMainSwitch(),
+              const SizedBox(height: 16),
+              if (_notificationsEnabled) ...[
+                _buildIntervalSection(),
+                const SizedBox(height: 16),
+                _buildTimeSection(),
+                const SizedBox(height: 16),
+                _buildInfoCard(),
+              ] else ...[
+                _buildDisabledMessage(),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -166,31 +180,33 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Интервал уведомлений',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 12.0,
+        const Text('Интервал уведомлений', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        Row(
           children: List.generate(3, (index) {
             final hour = index + 1;
-            return ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _intervalHours = hour;
-                });
-                _saveSettings();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _intervalHours == hour ? kBlue : kWhite,
-                foregroundColor: _intervalHours == hour ? kWhite : kBlue,
-                side: const BorderSide(color: kBlue),
+            final bool selected = _intervalHours == hour;
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(left: index == 0 ? 0 : 6, right: index == 2 ? 0 : 6),
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() => _intervalHours = hour);
+                      _saveSettings();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: selected ? kBlue : kWhite,
+                      foregroundColor: selected ? kWhite : kBlue,
+                      side: const BorderSide(color: kBlue),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: selected ? 1 : 0,
+                    ),
+                    child: Text('$hour ч'),
+                  ),
+                ),
               ),
-              child: Text('$hour ч.'),
             );
           }),
         ),

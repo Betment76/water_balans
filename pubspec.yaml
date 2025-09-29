@@ -44,14 +44,17 @@ dependencies:
   geocoding: ^4.0.0
   flutter_localizations:
     sdk: flutter
-  intl: ^0.20.2 # Уже добавлено, но уточняем что для локализации
+  intl: ^0.20.2 # Локализация для календаря на русском языке
   url_launcher: ^6.2.5 # Для открытия ссылок и email
   flutter_svg: ^2.2.0
   timezone: ^0.10.1
   http: ^1.5.0
   flutter_timezone: ^4.1.1
+  image_picker: ^1.1.2
+  permission_handler: ^11.3.1
   flutter_rustore_review: ^7.0.0 # RuStore SDK для отзывов и рейтингов
   flutter_rustore_pay: ^10.0.0 # RuStore Pay SDK рабочая версия из проекта давление
+  table_calendar: ^3.1.2 # Календарь для экрана статистики
 
 dev_dependencies:
   flutter_test:

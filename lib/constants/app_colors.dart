@@ -13,3 +13,4 @@ class AppColors {
 
 // Константы для обратной совместимости
 const Color kBlue = Colors.blue;
+const Color kWhite = Colors.white;

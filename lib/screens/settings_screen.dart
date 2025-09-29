@@ -3,7 +3,10 @@ import '../services/storage_service.dart';
 import '../models/user_settings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/user_settings_provider.dart';
+import '../providers/achievements_provider.dart';
 import '../services/weather_service.dart';
+import 'onboarding_screen.dart';
+import 'package:geolocator/geolocator.dart';
 import '../services/notification_service.dart';
 import '../services/calculation_service.dart';
 import '../services/rustore_review_service.dart';
@@ -50,10 +53,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _updateDailyNorm() {
     final weight = int.tryParse(weightController.text);
     if (weight != null && weight > 0) {
+      // 🌡️ Добавка от погоды только при температуре 30°C и выше
+      int weatherAddition = 0;
+      if (_temperature != null && _temperature! >= 30) {
+        // Каждый градус от 30°C добавляет 50 мл (максимум 500 мл при 40°C)
+        weatherAddition = ((_temperature! - 30) * 50).clamp(0, 500).round();
+      }
+      
       final norm = CalculationService.calculateDailyNorm(
         weight: weight,
         activityLevel: activityLevel,
+        weatherAddition: weatherAddition,
       );
+      
+      // 🔧 ДИАГНОСТИКА расчета нормы
+      print('🔧 РАСЧЕТ НОРМЫ:');
+      print('  Вес: $weight кг');
+      print('  Активность: $activityLevel (${[0, 250, 500][activityLevel]} мл)');
+      print('  Температура: $_temperature°C');
+      print('  Погодная добавка: $weatherAddition мл');
+      print('  ИТОГОВАЯ НОРМА: $norm мл');
+      
       dailyNormController.text = norm.toString();
     }
   }
@@ -64,9 +84,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (settings != null) {
       weightController.text = settings.weight.toString();
       heightController.text = settings.height?.toString() ?? '';
-      dailyNormController.text = settings.dailyNormML.toString();
       activityLevel = settings.activityLevel;
       selectedUnit = settings.unit;
+      
+      // 🔄 ПРИНУДИТЕЛЬНО пересчитываем норму с новой логикой
+      print('🔧 ДИАГНОСТИКА: Старая норма = ${settings.dailyNormML} мл');
+      _updateDailyNorm();
+      
+      // Автоматически сохраняем новую норму и обновляем достижения
+      Future.delayed(const Duration(milliseconds: 500), () async {
+        final newNorm = int.tryParse(dailyNormController.text);
+        if (newNorm != null && newNorm != settings.dailyNormML) {
+          print('🔧 АВТОСОХРАНЕНИЕ: Обновляем норму с ${settings.dailyNormML} на $newNorm мл');
+          _saveSettings();
+          
+          // 🏆 Обновляем достижения с новой нормой
+          try {
+            final achievementsService = ref.read(achievementsServiceProvider);
+            await achievementsService.initialize(dailyNormML: newNorm, forceReset: false);
+            print('🏆 Достижения обновлены для новой нормы $newNorm мл');
+          } catch (e) {
+            print('❌ Ошибка обновления достижений: $e');
+          }
+        }
+      });
     }
   }
 
@@ -89,20 +130,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _fetchWeather() async {
-    setState(() {
-      _isLoadingWeather = true;
-      _weatherError = null;
-    });
-    // Для примера — город Москва
-    final weatherData = await WeatherService.fetchWeatherByCity('Moscow');
-    setState(() {
-      _isLoadingWeather = false;
-      if (weatherData != null) {
-        _temperature = weatherData.temperature;
+    setState(() { _isLoadingWeather = true; _weatherError = null; });
+    try {
+      // Синхронизируем с логикой главного экрана: сначала геолокация, иначе Москва
+      final permission = await Geolocator.requestPermission();
+      if (permission != LocationPermission.denied && permission != LocationPermission.deniedForever) {
+        final position = await Geolocator.getCurrentPosition();
+        final weather = await WeatherService.fetchWeather(
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+        if (!mounted) return;
+        setState(() { _temperature = weather?.temperature; });
       } else {
-        _weatherError = 'Ошибка загрузки погоды';
+        // Без координат погоду не показываем
+        setState(() { _temperature = null; });
       }
-    });
+      if (_temperature == null) {
+        setState(() { _weatherError = 'Ошибка загрузки погоды'; });
+      }
+      _updateDailyNorm();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _weatherError = 'Ошибка: $e'; });
+    } finally {
+      if (mounted) setState(() { _isLoadingWeather = false; });
+    }
   }
 
   @override
@@ -268,28 +321,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Количество запросов: ${stats['requestCount']} / ${stats['maxRequests']}',
+                  "Количество запросов: ${stats['requestCount']} / ${stats['maxRequests']}",
                 ),
                 const SizedBox(height: 8),
-                Text('Можно запросить: ${stats['canRequest'] ? 'Да' : 'Нет'}'),
+                Text("Можно запросить: ${stats['canRequest'] ? 'Да' : 'Нет'}"),
                 const SizedBox(height: 8),
                 if (stats['lastRequest'] != null)
                   Text(
-                    'Последний запрос: ${DateTime.parse(stats['lastRequest']).toString().substring(0, 16)}',
+                    "Последний запрос: ${DateTime.parse(stats['lastRequest']).toString().substring(0, 16)}",
                   ),
                 const SizedBox(height: 8),
                 if (stats['firstLaunch'] != null)
                   Text(
-                    'Первый запуск: ${DateTime.parse(stats['firstLaunch']).toString().substring(0, 16)}',
+                    "Первый запуск: ${DateTime.parse(stats['firstLaunch']).toString().substring(0, 16)}",
                   ),
                 const SizedBox(height: 16),
                 const Text(
                   'Правила:',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                Text('• Мин. дней между запросами: ${stats['minDaysBetween']}'),
+                Text("• Мин. дней между запросами: ${stats['minDaysBetween']}"),
                 Text(
-                  '• Мин. дней перед первым запросом: ${stats['minDaysBeforeFirst']}',
+                  "• Мин. дней перед первым запросом: ${stats['minDaysBeforeFirst']}",
                 ),
               ],
             ),
@@ -393,347 +446,628 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.kWhite,
       appBar: AppBar(
-        title: const Text('Настройки'),
+        title: const Text('Настройки', style: TextStyle(color: Colors.white)),
         centerTitle: true,
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.kWhite,
+        backgroundColor: const Color(0xFF1976D2),
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          // Основные настройки
-          _buildSection(
-            title: 'Основные настройки',
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: weightController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: 'Вес (кг)',
-                        errorText: _weightError,
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 16,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1976D2), Color(0xFF64B5F6), Colors.white],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(top: 60, left: 12, right: 12, bottom: 12),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildCompactCard(
+                  title: 'Профиль',
+                  child: Column(
+                    children: [
+                      _buildTextFieldRow([
+                        _buildStylishTextField(
+                          controller: weightController,
+                          label: 'Вес (кг)',
+                          error: _weightError,
+                          icon: Icons.fitness_center,
                         ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: heightController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: 'Рост (см)',
-                        errorText: _heightError,
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 16,
+                        _buildStylishTextField(
+                          controller: heightController,
+                          label: 'Рост (см)',
+                          error: _heightError,
+                          icon: Icons.height,
                         ),
-                      ),
-                    ),
+                      ]),
+                      const SizedBox(height: 6),
+                      _buildActivitySlider(),
+                      const SizedBox(height: 6),
+                      _buildDailyNormRow(),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: dailyNormController,
-                      keyboardType: TextInputType.number,
-                      enabled: false, // Поле нормы нередактируемое
-                      decoration: InputDecoration(
-                        labelText: 'Норма (мл)',
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Укажите ваши параметры для расчета суточной нормы воды',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                  fontStyle: FontStyle.italic,
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Уровень активности'),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() => activityLevel = 0);
-                          _updateDailyNorm();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: activityLevel == 0
-                              ? AppColors.primary
-                              : Colors.grey.shade200,
-                          foregroundColor: activityLevel == 0
-                              ? Colors.white
-                              : Colors.black87,
-                          elevation: activityLevel == 0 ? 2 : 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text('Низкий'),
+                const SizedBox(height: 8),
+                _buildCompactCard(
+                  title: 'Погода',
+                  child: Row(
+                    children: [
+                      Expanded(child: _buildWeatherSummary()),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: _fetchWeather,
+                        icon: const Icon(Icons.refresh, color: Colors.blue),
+                        tooltip: 'Обновить',
                       ),
-                    ),
+                    ],
                   ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() => activityLevel = 1);
-                          _updateDailyNorm();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: activityLevel == 1
-                              ? AppColors.primary
-                              : Colors.grey.shade200,
-                          foregroundColor: activityLevel == 1
-                              ? Colors.white
-                              : Colors.black87,
-                          elevation: activityLevel == 1 ? 2 : 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text('Средний'),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() => activityLevel = 2);
-                          _updateDailyNorm();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: activityLevel == 2
-                              ? AppColors.primary
-                              : Colors.grey.shade200,
-                          foregroundColor: activityLevel == 2
-                              ? Colors.white
-                              : Colors.black87,
-                          elevation: activityLevel == 2 ? 2 : 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text('Высокий'),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // Единицы измерения
-          _buildSection(
-            title: 'Единицы измерения',
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: ElevatedButton(
-                        onPressed: () => setState(() => selectedUnit = 'мл'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: selectedUnit == 'мл'
-                              ? AppColors.primary
-                              : Colors.grey.shade200,
-                          foregroundColor: selectedUnit == 'мл'
-                              ? Colors.white
-                              : Colors.black87,
-                          elevation: selectedUnit == 'мл' ? 2 : 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text('мл'),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: ElevatedButton(
-                        onPressed: () => setState(() => selectedUnit = 'л'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: selectedUnit == 'л'
-                              ? AppColors.primary
-                              : Colors.grey.shade200,
-                          foregroundColor: selectedUnit == 'л'
-                              ? Colors.white
-                              : Colors.black87,
-                          elevation: selectedUnit == 'л' ? 2 : 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text('л'),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: ElevatedButton(
-                        onPressed: () => setState(() => selectedUnit = 'oz'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: selectedUnit == 'oz'
-                              ? AppColors.primary
-                              : Colors.grey.shade200,
-                          foregroundColor: selectedUnit == 'oz'
-                              ? Colors.white
-                              : Colors.black87,
-                          elevation: selectedUnit == 'oz' ? 2 : 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text('oz'),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // Pro функции (будут добавлены в следующих версиях)
-          // _buildProSection(),
-          const SizedBox(height: 24),
-
-          // RuStore billing
-          _buildSection(
-            title: 'Покупки RuStore',
-            children: [
-              ListTile(
-                leading: Icon(
-                  _isAdFree ? Icons.check_circle : Icons.shopping_cart,
-                  color: _isAdFree ? Colors.green : Colors.orange,
                 ),
-                title: const Text('Статус без рекламы'),
-                subtitle: Text(
-                  _isAdFree ? 'Реклама отключена' : 'Реклама включена',
+                const SizedBox(height: 8),
+                _buildCompactCard(
+                  title: 'VIP',
+                  child: Row(
+                    children: [
+                      Icon(_isAdFree ? Icons.verified : Icons.diamond, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_isAdFree ? 'Реклама отключена' : 'Уберите рекламу и поддержите нас')),
+                      IconButton(
+                        onPressed: _isAdFree ? null : _purchaseRemoveAds,
+                        icon: const Icon(Icons.currency_ruble, color: Colors.green),
+                        tooltip: 'Купить',
+                      ),
+                    ],
+                  ),
                 ),
-                trailing: _isAdFree
-                    ? const Icon(Icons.check, color: Colors.green)
-                    : null,
-              ),
-              ListTile(
-                leading: const Icon(Icons.payment, color: Colors.blue),
-                title: const Text('Отключить рекламу'),
-                subtitle: const Text('Покупка одноразовая'),
-                onTap: _isAdFree ? null : _purchaseRemoveAds,
-              ),
-              ListTile(
-                leading: const Icon(Icons.restore, color: Colors.purple),
-                title: const Text('Восстановить покупки'),
-                subtitle: const Text('Проверить существующие покупки'),
-                onTap: _restorePurchases,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // Отзывы и рейтинг
-          _buildSection(
-            title: 'Отзывы и рейтинг',
-            children: [
-              ListTile(
-                leading: const Icon(Icons.star, color: Colors.amber),
-                title: const Text('Оценить приложение'),
-                subtitle: const Text('Оставьте отзыв в RuStore'),
-                onTap: _requestReview,
-              ),
-              ListTile(
-                leading: const Icon(Icons.info, color: Colors.blue),
-                title: const Text('Статистика отзывов'),
-                subtitle: const Text('Показать информацию о запросах'),
-                onTap: _showReviewStats,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // Опасная зона
-          _buildSection(
-            title: 'Опасная зона',
-            children: [
-              ListTile(
-                leading: const Icon(Icons.delete_forever, color: Colors.red),
-                title: const Text('Сбросить все данные'),
-                subtitle: const Text('Удалить все настройки и историю'),
-                onTap: _resetData,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 32),
-
-          ElevatedButton(
-            onPressed: _saveSettings,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 48),
+                const SizedBox(height: 8),
+                _buildCompactCard(
+                  title: '',
+                  child: Column(
+                    children: [
+                      SizedBox(height: 44, width: double.infinity, child: _buildPrimarySaveButton()),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 44,
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF1976D2)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            foregroundColor: const Color(0xFF1976D2),
+                          ),
+                          icon: const Icon(Icons.slideshow),
+                          label: const Text('Показать экран первого входа'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            child: const Text('Сохранить настройки'),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 🎨 Стильный заголовок экрана
+  Widget _buildStylishHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 70, bottom: 20, left: 20, right: 20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(Icons.settings, color: Colors.white, size: 30),
+          ),
+          const SizedBox(width: 15),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Настройки', 
+                style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              Text('Персонализируй свой опыт', 
+                style: TextStyle(color: Colors.white70, fontSize: 14)),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSection({
+  /// 🎭 Карточка настроек с градиентом
+  Widget _buildSettingsCard({
     required String title,
+    required IconData icon,
+    required Gradient gradient,
     required List<Widget> children,
   }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Заголовок с градиентом
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: gradient,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Содержимое карточки
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: children,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 🧩 Компактная карточка (плоская, без большого хедера)
+  Widget _buildCompactCard({required String title, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          child,
+        ],
+      ),
+    );
+  }
+
+  /// 📝 Стильное текстовое поле
+  Widget _buildStylishTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? error,
+  }) {
+    return Expanded(
+      child: SizedBox(
+        height: 48,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: error != null ? Colors.red.shade300 : Colors.grey.shade300,
+            ),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            decoration: InputDecoration(
+              labelText: label,
+              errorText: error,
+              prefixIcon: Icon(icon, color: Colors.grey.shade600, size: 18),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 📏 Строка с текстовыми полями
+  Widget _buildTextFieldRow(List<Widget> fields) {
+    return Row(
+      children: [
+        for (int i = 0; i < fields.length; i++) ...[
+          fields[i],
+          if (i < fields.length - 1) const SizedBox(width: 12),
+        ]
+      ],
+    );
+  }
+
+  /// 🍬 Всплывающее сообщение
+  void _showSnack(String message) {
+    // Показываем краткое уведомление пользователю
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  /// ⚡ Быстрое действие (иконка + подпись)
+  // Используем локальный виджет для компактных кнопок
+  // Комментарии на русском для ясности
+  Widget _QuickAction({required IconData icon, required String label, VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 64,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFF1976D2), size: 20),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+ 
+  /// 🏃 Слайдер уровня активности
+  Widget _buildActivitySlider() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
-          ),
+        const Text(
+          'Уровень активности',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
-        ...children,
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue.shade200),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Низкий', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  Text('Уровень $activityLevel', 
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Text('Высокий', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                ],
+              ),
+              Slider(
+                value: activityLevel.toDouble(),
+                min: 1,
+                max: 5,
+                divisions: 4,
+                activeColor: Colors.blue,
+                onChanged: (value) {
+                  setState(() {
+                    activityLevel = value.toInt();
+                  });
+                  _updateDailyNorm();
+                },
+              ),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  /// 💧 Отображение дневной нормы
+  Widget _buildDailyNormRow() {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFF4facfe), Color(0xFF00f2fe)]),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          const Icon(Icons.local_drink, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          const Text('Дневная норма', style: TextStyle(color: Colors.white70, fontSize: 13)),
+          const Spacer(),
+          Text('${dailyNormController.text} мл',
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  /// 🌤️ Секция погоды
+  Widget _buildWeatherSection() {
+    return Column(
+      children: [
+        if (_isLoadingWeather)
+          const Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Text('Получение данных о погоде...')
+            ],
+          )
+        else if (_weatherError != null)
+          Row(
+            children: [
+              Icon(Icons.error, color: Colors.red.shade400, size: 20),
+              const SizedBox(width: 12),
+              Expanded(child: Text(_weatherError!, style: const TextStyle(color: Colors.red))),
+            ],
+          )
+        else if (_temperature != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.thermostat, color: Colors.orange.shade600, size: 24),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Текущая температура: ${_temperature!.round()}°C',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                    ),
+                    Text(
+                      _temperature! >= 30 ? 'Жаркая погода - норма увеличена' : 'Комфортная погода',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Краткий вид погоды для компактной карточки
+  Widget _buildWeatherSummary() {
+    if (_isLoadingWeather) {
+      return const Row(children: [SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)), SizedBox(width: 8), Text('Загрузка...')]);
+    }
+    if (_weatherError != null) {
+      return Row(children: [Icon(Icons.error, color: Colors.red.shade400, size: 18), const SizedBox(width: 8), Expanded(child: Text(_weatherError!, maxLines: 2))]);
+    }
+    if (_temperature != null) {
+      final hot = _temperature! >= 30;
+      return Row(children: [
+        Icon(Icons.thermostat, color: hot ? Colors.orange : Colors.blue, size: 20),
+        const SizedBox(width: 8),
+        Text('${_temperature!.round()}°C'),
+        const SizedBox(width: 8),
+        Text(hot ? 'Жара' : 'Комфорт', style: TextStyle(color: Colors.grey.shade600)),
+      ]);
+    }
+    return const Text('Нет данных');
+  }
+
+  /// 🔔 Настройки уведомлений
+  Widget _buildNotificationSettings() {
+    return const Column(
+      children: [
+        ListTile(
+          leading: Icon(Icons.alarm, color: Colors.blue),
+          title: Text('Настройка напоминаний'),
+          subtitle: Text('Перейдите в раздел "Напоминания" для настройки'),
+          contentPadding: EdgeInsets.zero,
+        ),
+      ],
+    );
+  }
+
+  /// 💎 Премиум секция
+  Widget _buildPremiumSection() {
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.remove_circle_outline, color: Colors.orange),
+          title: Text(_isAdFree ? 'Реклама отключена' : 'Отключить рекламу'),
+          subtitle: Text(_isAdFree ? 'Спасибо за поддержку!' : 'Убрать рекламные баннеры'),
+          trailing: _isAdFree 
+            ? const Icon(Icons.check, color: Colors.green)
+            : const Icon(Icons.arrow_forward_ios, size: 16),
+          contentPadding: EdgeInsets.zero,
+          onTap: _isAdFree ? null : _purchaseRemoveAds,
+        ),
+        if (!_isAdFree) const SizedBox(height: 12),
+        if (!_isAdFree)
+          ListTile(
+            leading: const Icon(Icons.restore, color: Colors.purple),
+            title: const Text('Восстановить покупки'),
+            subtitle: const Text('Проверить существующие покупки'),
+            contentPadding: EdgeInsets.zero,
+            onTap: _restorePurchases,
+          ),
+      ],
+    );
+  }
+
+  /// ⭐ Секция отзывов
+  Widget _buildReviewSection() {
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.star, color: Colors.amber),
+          title: const Text('Оценить приложение'),
+          subtitle: const Text('Оставьте отзыв в RuStore'),
+          contentPadding: EdgeInsets.zero,
+          onTap: _requestReview,
+        ),
+        const SizedBox(height: 12),
+        ListTile(
+          leading: const Icon(Icons.info, color: Colors.blue),
+          title: const Text('Статистика отзывов'),
+          subtitle: const Text('Показать информацию о запросах'),
+          contentPadding: EdgeInsets.zero,
+          onTap: _showReviewStats,
+        ),
+      ],
+    );
+  }
+
+  /// ⚠️ Опасная зона
+  Widget _buildDangerZone() {
+    return ListTile(
+      leading: const Icon(Icons.delete_forever, color: Colors.red),
+      title: const Text('Сбросить все данные'),
+      subtitle: const Text('Удалить все настройки и историю'),
+      contentPadding: EdgeInsets.zero,
+      onTap: _resetData,
+    );
+  }
+
+  /// 💾 Стильная кнопка сохранения (полноразмерная)
+  Widget _buildStylishSaveButton() {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667eea).withOpacity(0.4),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: _saveSettings,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.save, color: Colors.white, size: 24),
+            SizedBox(width: 12),
+            Text(
+              'Сохранить настройки',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 💾 Кнопка для компактной карточки
+  Widget _buildPrimarySaveButton({bool textless = false}) {
+    return ElevatedButton.icon(
+      onPressed: _saveSettings,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF1976D2),
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      icon: const Icon(Icons.save),
+      label: textless ? const SizedBox.shrink() : const Text('Сохранить'),
     );
   }
 }

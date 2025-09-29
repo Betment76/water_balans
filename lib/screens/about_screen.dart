@@ -21,17 +21,23 @@ class _AboutScreenState extends State<AboutScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.kWhite,
       appBar: AppBar(
-        title: const Text('О приложении'),
+        title: const Text('О приложении', style: TextStyle(color: Colors.white)),
         centerTitle: true,
         backgroundColor: kBlue,
-        foregroundColor: AppColors.kWhite,
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1976D2), Color(0xFF64B5F6), Colors.white],
+          ),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.only(top: 86.0, left: 16.0, right: 16.0, bottom: 16.0),
+          children: [
           // Логотип и название
           _buildHeader(),
 
@@ -52,6 +58,7 @@ class _AboutScreenState extends State<AboutScreen> {
 
           const SizedBox(height: 32),
         ],
+        ),
       ),
     );
   }
@@ -60,35 +67,18 @@ class _AboutScreenState extends State<AboutScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            color: kBlue,
-            borderRadius: BorderRadius.circular(60),
-            boxShadow: [
-              BoxShadow(
-                color: kBlue.withOpacity(0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.water_drop, size: 60, color: Colors.white),
-        ),
-        const SizedBox(height: 16),
         const Text(
           'Водный баланс',
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: kBlue,
+            color: Colors.white,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         const Text(
           'Версия 1.3.0',
-          style: TextStyle(fontSize: 16, color: Colors.grey),
+          style: TextStyle(fontSize: 16, color: Colors.white),
         ),
       ],
     );
@@ -96,15 +86,18 @@ class _AboutScreenState extends State<AboutScreen> {
 
   /// Информация о разработчике
   Widget _buildDeveloperInfo() {
-    return Card(
-      color: const Color(0xFFE3F2FD), // Светло-голубой цвет
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return InkWell(
+      onTap: () => _launchUrl('https://www.rustore.ru/catalog/developer/e031c637'), // открыть профиль разработчика
+      borderRadius: BorderRadius.circular(12),
+      child: Card(
+        color: const Color(0xFFE3F2FD), // Светло-голубой цвет
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             const Text(
               'Разработчик',
               style: TextStyle(
@@ -146,7 +139,8 @@ class _AboutScreenState extends State<AboutScreen> {
                 ),
               ],
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -326,6 +320,14 @@ class _AboutScreenState extends State<AboutScreen> {
 
     if (await canLaunchUrl(emailUri)) {
       await launchUrl(emailUri);
+    }
+  }
+
+  /// Открыть внешний URL в браузере
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 }

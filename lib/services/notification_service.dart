@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tzdata;
 import '../models/user_settings.dart';
 
 /// Сервис для работы с локальными уведомлениями
@@ -9,6 +11,9 @@ class NotificationService {
 
   /// Инициализация уведомлений
   static Future initialize() async {
+    // Инициализируем таймзоны (без этого расписание может не работать корректно)
+    tzdata.initializeTimeZones();
+
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const DarwinInitializationSettings darwinSettings =
@@ -19,6 +24,21 @@ class NotificationService {
       macOS: darwinSettings,
     );
     await _notifications.initialize(settings);
+
+    // Запрашиваем разрешения (Android 13+ и iOS)
+    if (Platform.isAndroid) {
+      final androidImpl = _notifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await androidImpl?.requestNotificationsPermission();
+    } else if (Platform.isIOS) {
+      final iosImpl = _notifications.resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin>();
+      await iosImpl?.requestPermissions(alert: true, badge: true, sound: true);
+    } else if (Platform.isMacOS) {
+      final macImpl = _notifications.resolvePlatformSpecificImplementation<
+          MacOSFlutterLocalNotificationsPlugin>();
+      await macImpl?.requestPermissions(alert: true, badge: true, sound: true);
+    }
   }
 
   /// Запланировать напоминания по пользовательским настройкам
@@ -44,6 +64,8 @@ class NotificationService {
       }
     }
 
+    if (interval <= 0) return; // если напоминания выключены
+
     for (int hour = firstTime.hour; hour <= endHour; hour += interval) {
       if (disableAtNight && (hour < startHour || hour > endHour)) continue;
 
@@ -67,6 +89,28 @@ class NotificationService {
         matchDateTimeComponents: DateTimeComponents.time,
       );
     }
+  }
+
+  /// Быстрая проверка статуса разрешений (для диагностики)
+  static Future<Map<String, dynamic>> checkPermissionsStatus() async {
+    final result = <String, dynamic>{};
+    if (Platform.isAndroid) {
+      final androidImpl = _notifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      final bool? granted = await androidImpl?.areNotificationsEnabled();
+      result['post_notifications_granted'] = granted ?? false;
+    } else if (Platform.isIOS) {
+      final iosImpl = _notifications.resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin>();
+      final bool? granted = await iosImpl?.requestPermissions();
+      result['permissions_granted'] = granted ?? false;
+    } else if (Platform.isMacOS) {
+      final macImpl = _notifications.resolvePlatformSpecificImplementation<
+          MacOSFlutterLocalNotificationsPlugin>();
+      final bool? granted = await macImpl?.requestPermissions();
+      result['permissions_granted'] = granted ?? false;
+    }
+    return result;
   }
 
   /// Отключить все уведомления

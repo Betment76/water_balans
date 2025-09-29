@@ -21,58 +21,20 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   @override
   void initState() {
     super.initState();
-    _checkAdFreeStatusAndLoadAd();
+    // 📺 Баннер теперь управляется глобально в MainNavigationScreen
+    _checkAdFreeStatus();
   }
 
-  Future<void> _checkAdFreeStatusAndLoadAd() async {
-    // Проверяем, куплено ли отключение рекламы
+  Future<void> _checkAdFreeStatus() async {
+    // 📺 Только проверяем статус без рекламы, сам баннер управляется глобально
     final isAdFree = await RustorePayService.isAdFree();
-
-    if (isAdFree) {
-      // Если реклама отключена, не показываем баннер
-      setState(() {
-        _isLoading = false;
-        _isAdLoaded = false;
-      });
-      return;
-    }
-
-    // Если реклама не отключена, загружаем баннер
-    _loadAd();
+    
+    setState(() {
+      _isLoading = false;
+      _isAdLoaded = !isAdFree; // Если реклама не отключена, считаем что баннер загружен
+    });
   }
 
-  Future<void> _loadAd() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
-
-      // Проверяем, доступна ли реклама
-      final isAvailable = await MyTargetAdService.isAdAvailable();
-
-      if (isAvailable && mounted) {
-        // Показываем баннер точно под AppBar
-        await MyTargetAdService.showBannerUnderAppBar(_bannerId);
-
-        setState(() {
-          _isAdLoaded = true;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Реклама недоступна';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Ошибка загрузки рекламы: $e';
-      });
-      print('Ошибка загрузки баннера MyTarget: $e');
-    }
-  }
 
   @override
   void dispose() {
