@@ -17,6 +17,19 @@ class StorageService {
   static DateTime? _cacheTime;
   static const Duration _cacheTimeout = Duration(minutes: 5); // Кэш на 5 минут
 
+  /// Универсальные строки (произвольные ключи)
+  static Future<void> setString(String key, String value) async {
+    // Сохранение произвольной строки в SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, value);
+  }
+
+  static Future<String?> getString(String key) async {
+    // Чтение произвольной строки из SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(key);
+  }
+
   /// Сохранить настройки пользователя
   static Future<void> saveUserSettings(UserSettings settings) async {
     final prefs = await SharedPreferences.getInstance();

@@ -16,6 +16,7 @@ class _BubblesWidgetState extends State<BubblesWidget>
   late AnimationController _controller; // Контроллер для управления анимацией
   late List<_Bubble> _bubbles; // Список пузырьков
   final Random _random = Random(); // Генератор случайных чисел
+  Size? _lastSize; // Последний известный размер рисуемой области
 
   @override
   void initState() {
@@ -25,6 +26,7 @@ class _BubblesWidgetState extends State<BubblesWidget>
       duration: const Duration(seconds: 10), // Длительность анимации
       vsync: this,
     )..addListener(() {
+        if (!mounted) return;
         _updateBubbles(); // Обновление состояния пузырьков при каждом тике анимации
       });
     _controller.repeat(); // Запуск повторяющейся анимации
@@ -45,17 +47,17 @@ class _BubblesWidgetState extends State<BubblesWidget>
     }
 
     // Обновляем положение каждого пузырька и удаляем те, что вышли за пределы экрана
-    setState(() {
-      for (var bubble in _bubbles) {
-        bubble.y -= bubble.speed;
-      }
-      final renderBoxSize = context.size;
-      if (renderBoxSize != null && renderBoxSize.height > 0) {
-        _bubbles.removeWhere(
-          (bubble) => bubble.y < (1 - widget.waterHeight / renderBoxSize.height) - 0.1,
-        );
-      }
-    });
+    if (!mounted) return;
+    final Size? renderBoxSize = _lastSize ?? context.size;
+    for (var bubble in _bubbles) {
+      bubble.y -= bubble.speed;
+    }
+    if (renderBoxSize != null && renderBoxSize.height > 0) {
+      _bubbles.removeWhere(
+        (bubble) => bubble.y < (1 - widget.waterHeight / renderBoxSize.height) - 0.1,
+      );
+    }
+    if (mounted) setState(() {});
   }
 
   @override
@@ -66,9 +68,22 @@ class _BubblesWidgetState extends State<BubblesWidget>
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _BubblePainter(bubbles: _bubbles, waterHeight: widget.waterHeight),
-      size: Size.infinite,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double width = constraints.maxWidth.isFinite ? constraints.maxWidth : 0;
+        final double height = constraints.maxHeight.isFinite ? constraints.maxHeight : 0;
+        _lastSize = Size(width, height);
+        return SizedBox(
+          width: width > 0 ? width : null,
+          height: height > 0 ? height : null,
+          child: CustomPaint(
+            painter: _BubblePainter(
+              bubbles: _bubbles,
+              waterHeight: widget.waterHeight,
+            ),
+          ),
+        );
+      },
     );
   }
 }

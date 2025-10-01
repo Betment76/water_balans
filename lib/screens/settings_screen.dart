@@ -8,6 +8,11 @@ import '../services/weather_service.dart';
 import 'onboarding_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/notification_service.dart';
+import 'package:package_info_plus/package_info_plus.dart'; // версия приложения
+import 'package:url_launcher/url_launcher.dart'; // обратная связь
+import 'profile_settings_screen.dart'; // экран профиля
+// удалили общий экран
+import 'reminders_screen.dart'; // экран напоминаний
 import '../services/calculation_service.dart';
 import '../services/rustore_review_service.dart';
 import '../services/rustore_pay_service.dart';
@@ -38,6 +43,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   double? _temperature;
   bool _isLoadingWeather = false;
   String? _weatherError;
+  String _version = ''; // версия
+  String _lastSyncText = '—'; // последняя синхронизация
 
   @override
   void initState() {
@@ -69,7 +76,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       // 🔧 ДИАГНОСТИКА расчета нормы
       print('🔧 РАСЧЕТ НОРМЫ:');
       print('  Вес: $weight кг');
-      print('  Активность: $activityLevel (${[0, 250, 500][activityLevel]} мл)');
+      print('  Активность: $activityLevel (${[0, 250, 500][activityLevel.clamp(0,2)]} мл)');
       print('  Температура: $_temperature°C');
       print('  Погодная добавка: $weatherAddition мл');
       print('  ИТОГОВАЯ НОРМА: $norm мл');
@@ -84,7 +91,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (settings != null) {
       weightController.text = settings.weight.toString();
       heightController.text = settings.height?.toString() ?? '';
-      activityLevel = settings.activityLevel;
+      // Нормализуем уровень активности к 3 градациям: 0-низкий,1-средний,2-высокий
+      final savedLevel = settings.activityLevel;
+      activityLevel = savedLevel <= 2 ? savedLevel : (((savedLevel - 1) / 2).round()).clamp(0, 2);
       selectedUnit = settings.unit;
       
       // 🔄 ПРИНУДИТЕЛЬНО пересчитываем норму с новой логикой
@@ -109,6 +118,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         }
       });
     }
+    // 🏷️ Читаем время последнего сохранения
+    StorageService.getString('lastSettingsSaved').then((ts) {
+      if (!mounted) return;
+      setState(() {
+        _lastSyncText = ts != null
+            ? _formatRelative(DateTime.tryParse(ts))
+            : '—';
+      });
+    });
+    // 📦 Версия приложения
+    PackageInfo.fromPlatform().then((p) {
+      if (!mounted) return;
+      setState(() => _version = '${p.version}+${p.buildNumber}');
+    });
   }
 
   Future<void> _checkProStatus() async {
@@ -200,6 +223,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     ref.read(userSettingsProvider.notifier).save(settings);
     NotificationService.scheduleReminders(settings);
+
+    // 🕒 Запоминаем время сохранения для карточки профиля
+    StorageService.setString('lastSettingsSaved', DateTime.now().toIso8601String());
 
     ScaffoldMessenger.of(
       context,
@@ -447,7 +473,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Настройки', style: TextStyle(color: Colors.white)),
+        title: const Text('Настройки', style: TextStyle(color: Colors.white)), // заголовок
         centerTitle: true,
         backgroundColor: const Color(0xFF1976D2),
         elevation: 0,
@@ -461,99 +487,215 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.only(top: 60, left: 12, right: 12, bottom: 12),
+          padding: const EdgeInsets.only(top: 86, left: 16, right: 16, bottom: 16), // отступ под глобальный баннер
           child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.only(bottom: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildCompactCard(
-                  title: 'Профиль',
-                  child: Column(
-                    children: [
-                      _buildTextFieldRow([
-                        _buildStylishTextField(
-                          controller: weightController,
-                          label: 'Вес (кг)',
-                          error: _weightError,
-                          icon: Icons.fitness_center,
-                        ),
-                        _buildStylishTextField(
-                          controller: heightController,
-                          label: 'Рост (см)',
-                          error: _heightError,
-                          icon: Icons.height,
-                        ),
-                      ]),
-                      const SizedBox(height: 6),
-                      _buildActivitySlider(),
-                      const SizedBox(height: 6),
-                      _buildDailyNormRow(),
-                    ],
-                  ),
+        children: [
+              _buildProfileHeaderCard(), // карточка профиля
+              const SizedBox(height: 12),
+              _buildSettingsListCard(), // список настроек
+              const SizedBox(height: 12),
+              _buildSupportListCard(), // поддержка
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  'Version ${_version.isEmpty ? '—' : _version}',
+                  style: TextStyle(color: Colors.grey.shade700),
                 ),
-                const SizedBox(height: 8),
-                _buildCompactCard(
-                  title: 'Погода',
-                  child: Row(
-                    children: [
-                      Expanded(child: _buildWeatherSummary()),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: _fetchWeather,
-                        icon: const Icon(Icons.refresh, color: Colors.blue),
-                        tooltip: 'Обновить',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _buildCompactCard(
-                  title: 'VIP',
-                  child: Row(
-                    children: [
-                      Icon(_isAdFree ? Icons.verified : Icons.diamond, color: Colors.orange),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(_isAdFree ? 'Реклама отключена' : 'Уберите рекламу и поддержите нас')),
-                      IconButton(
-                        onPressed: _isAdFree ? null : _purchaseRemoveAds,
-                        icon: const Icon(Icons.currency_ruble, color: Colors.green),
-                        tooltip: 'Купить',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _buildCompactCard(
-                  title: '',
-                  child: Column(
-                    children: [
-                      SizedBox(height: 44, width: double.infinity, child: _buildPrimarySaveButton()),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 44,
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF1976D2)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            foregroundColor: const Color(0xFF1976D2),
-                          ),
-                          icon: const Icon(Icons.slideshow),
-                          label: const Text('Показать экран первого входа'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  /// 👤 Карточка профиля в стиле макета
+  Widget _buildProfileHeaderCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0,6))],
+      ),
+      child: Row(
+            children: [
+          const CircleAvatar(radius: 28, backgroundColor: Color(0xFFE3F2FD), child: Icon(Icons.person, color: Color(0xFF1976D2))), // аватар
+          const SizedBox(width: 16),
+                  Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Мой профиль', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)), // имя/заголовок
+                const SizedBox(height: 4),
+                Text('Посл. синхр.: $_lastSyncText', style: TextStyle(color: Colors.grey.shade600)), // синхронизация
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: _saveSettings, // быстрая синхронизация (сохраняем настройки)
+            icon: const Icon(Icons.sync, color: Color(0xFF1976D2)),
+            tooltip: 'Синхронизировать',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ⚙️ Список настроек (как на скрине)
+  Widget _buildSettingsListCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0,6))],
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            leading: const CircleAvatar(backgroundColor: Color(0xFFE3F2FD), child: Icon(Icons.emoji_emotions, color: Color(0xFF1976D2))),
+            title: const Text('Мой Профиль', style: TextStyle(fontWeight: FontWeight.w600)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfileSettingsScreen()),
+              );
+            },
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const CircleAvatar(backgroundColor: Color(0xFFFFF3E0), child: Icon(Icons.alarm, color: Color(0xFFF57C00))),
+            title: const Text('Настройка уведомлений', style: TextStyle(fontWeight: FontWeight.w600)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RemindersScreen())),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const CircleAvatar(backgroundColor: Color(0xFFFFF3E0), child: Icon(Icons.language, color: Color(0xFFF57C00))),
+            title: const Text('Язык', style: TextStyle(fontWeight: FontWeight.w600)),
+            trailing: const Text('Русский'),
+            onTap: () {}, // зарезервировано под выбор языка
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const CircleAvatar(backgroundColor: Color(0xFFE0F7FA), child: Icon(Icons.straighten, color: Color(0xFF00ACC1))),
+            title: const Text('Единицы измерения', style: TextStyle(fontWeight: FontWeight.w600)),
+            trailing: Text(selectedUnit.toUpperCase()),
+            onTap: _showUnitPicker,
+                  ),
+                ],
+              ),
+    );
+  }
+
+  /// 💬 Поддержка/покупки/оценка
+  Widget _buildSupportListCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0,6))],
+      ),
+      child: Column(
+                children: [
+          ListTile(
+            leading: const CircleAvatar(backgroundColor: Color(0xFFE8F5E9), child: Icon(Icons.no_adult_content, color: Color(0xFF388E3C))),
+            title: const Text('Убрать рекламу', style: TextStyle(fontWeight: FontWeight.w600)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _isAdFree ? null : _purchaseRemoveAds,
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const CircleAvatar(backgroundColor: Color(0xFFFFFDE7), child: Icon(Icons.star, color: Color(0xFFFFB300))),
+            title: const Text('Оцените нас', style: TextStyle(fontWeight: FontWeight.w600)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _requestReview,
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const CircleAvatar(backgroundColor: Color(0xFFE3F2FD), child: Icon(Icons.edit, color: Color(0xFF1976D2))),
+            title: const Text('Обратная связь', style: TextStyle(fontWeight: FontWeight.w600)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              // Открываем почту
+              final uri = Uri.parse('mailto:support@example.com?subject=Water%20Balance%20Feedback');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+            },
+                  ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const CircleAvatar(backgroundColor: Color(0xFFE3F2FD), child: Icon(Icons.slideshow, color: Color(0xFF1976D2))),
+            title: const Text('Показать экран первого входа', style: TextStyle(fontWeight: FontWeight.w600)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+                    ),
+                  ),
+                ],
+              ),
+    );
+  }
+
+  /// 🗓️ Формат «вчера/сегодня/дата»
+  String _formatRelative(DateTime? dt) {
+    if (dt == null) return '—';
+    final now = DateTime.now();
+    final d = DateTime(dt.year, dt.month, dt.day);
+    final n = DateTime(now.year, now.month, now.day);
+    if (d == n) return 'сегодня';
+    if (d.add(const Duration(days: 1)) == n) return 'вчера';
+    return '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}';
+  }
+
+  /// Выбор единиц измерения (мл / л / oz)
+  void _showUnitPicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('Миллилитры (мл)'),
+                trailing: selectedUnit == 'мл' ? const Icon(Icons.check, color: Color(0xFF1976D2)) : null,
+                onTap: () {
+                  setState(() => selectedUnit = 'мл');
+                  Navigator.pop(context);
+                  _saveSettings();
+                },
+              ),
+              ListTile(
+                title: const Text('Литры (л)'),
+                trailing: selectedUnit == 'л' ? const Icon(Icons.check, color: Color(0xFF1976D2)) : null,
+                onTap: () {
+                  setState(() => selectedUnit = 'л');
+                  Navigator.pop(context);
+                  _saveSettings();
+                },
+              ),
+              ListTile(
+                title: const Text('Унции (oz)'),
+                trailing: selectedUnit == 'oz' ? const Icon(Icons.check, color: Color(0xFF1976D2)) : null,
+                onTap: () {
+                  setState(() => selectedUnit = 'oz');
+                  Navigator.pop(context);
+                  _saveSettings();
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -570,7 +712,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
       child: Row(
-        children: [
+                children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -657,9 +799,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             padding: const EdgeInsets.all(20),
             child: Column(
               children: children,
-            ),
-          ),
-        ],
+                    ),
+                  ),
+                ],
       ),
     );
   }
@@ -677,12 +819,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             color: Colors.black.withOpacity(0.06),
             blurRadius: 10,
             offset: const Offset(0, 6),
+              ),
+            ],
           ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+            children: [
           Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
           child,
@@ -730,7 +872,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// 📏 Строка с текстовыми полями
   Widget _buildTextFieldRow(List<Widget> fields) {
     return Row(
-      children: [
+            children: [
         for (int i = 0; i < fields.length; i++) ...[
           fields[i],
           if (i < fields.length - 1) const SizedBox(width: 12),
@@ -768,7 +910,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+                children: [
             Icon(icon, color: const Color(0xFF1976D2), size: 20),
             const SizedBox(width: 8),
             Flexible(
@@ -905,11 +1047,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     Text(
                       _temperature! >= 30 ? 'Жаркая погода - норма увеличена' : 'Комфортная погода',
                       style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
+          ),
           ),
       ],
     );
@@ -939,8 +1081,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// 🔔 Настройки уведомлений
   Widget _buildNotificationSettings() {
     return const Column(
-      children: [
-        ListTile(
+            children: [
+              ListTile(
           leading: Icon(Icons.alarm, color: Colors.blue),
           title: Text('Настройка напоминаний'),
           subtitle: Text('Перейдите в раздел "Напоминания" для настройки'),
@@ -958,56 +1100,56 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           leading: const Icon(Icons.remove_circle_outline, color: Colors.orange),
           title: Text(_isAdFree ? 'Реклама отключена' : 'Отключить рекламу'),
           subtitle: Text(_isAdFree ? 'Спасибо за поддержку!' : 'Убрать рекламные баннеры'),
-          trailing: _isAdFree 
-            ? const Icon(Icons.check, color: Colors.green)
+                trailing: _isAdFree
+                    ? const Icon(Icons.check, color: Colors.green)
             : const Icon(Icons.arrow_forward_ios, size: 16),
           contentPadding: EdgeInsets.zero,
-          onTap: _isAdFree ? null : _purchaseRemoveAds,
-        ),
+                onTap: _isAdFree ? null : _purchaseRemoveAds,
+              ),
         if (!_isAdFree) const SizedBox(height: 12),
         if (!_isAdFree)
-          ListTile(
-            leading: const Icon(Icons.restore, color: Colors.purple),
-            title: const Text('Восстановить покупки'),
-            subtitle: const Text('Проверить существующие покупки'),
+              ListTile(
+                leading: const Icon(Icons.restore, color: Colors.purple),
+                title: const Text('Восстановить покупки'),
+                subtitle: const Text('Проверить существующие покупки'),
             contentPadding: EdgeInsets.zero,
-            onTap: _restorePurchases,
-          ),
-      ],
+                onTap: _restorePurchases,
+              ),
+            ],
     );
   }
 
   /// ⭐ Секция отзывов
   Widget _buildReviewSection() {
     return Column(
-      children: [
-        ListTile(
-          leading: const Icon(Icons.star, color: Colors.amber),
-          title: const Text('Оценить приложение'),
-          subtitle: const Text('Оставьте отзыв в RuStore'),
+            children: [
+              ListTile(
+                leading: const Icon(Icons.star, color: Colors.amber),
+                title: const Text('Оценить приложение'),
+                subtitle: const Text('Оставьте отзыв в RuStore'),
           contentPadding: EdgeInsets.zero,
-          onTap: _requestReview,
-        ),
+                onTap: _requestReview,
+              ),
         const SizedBox(height: 12),
-        ListTile(
-          leading: const Icon(Icons.info, color: Colors.blue),
-          title: const Text('Статистика отзывов'),
-          subtitle: const Text('Показать информацию о запросах'),
+              ListTile(
+                leading: const Icon(Icons.info, color: Colors.blue),
+                title: const Text('Статистика отзывов'),
+                subtitle: const Text('Показать информацию о запросах'),
           contentPadding: EdgeInsets.zero,
-          onTap: _showReviewStats,
-        ),
-      ],
+                onTap: _showReviewStats,
+              ),
+            ],
     );
   }
 
   /// ⚠️ Опасная зона
   Widget _buildDangerZone() {
     return ListTile(
-      leading: const Icon(Icons.delete_forever, color: Colors.red),
-      title: const Text('Сбросить все данные'),
-      subtitle: const Text('Удалить все настройки и историю'),
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text('Сбросить все данные'),
+                subtitle: const Text('Удалить все настройки и историю'),
       contentPadding: EdgeInsets.zero,
-      onTap: _resetData,
+                onTap: _resetData,
     );
   }
 
@@ -1028,27 +1170,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             color: const Color(0xFF667eea).withOpacity(0.4),
             blurRadius: 15,
             offset: const Offset(0, 8),
+              ),
+            ],
           ),
-        ],
-      ),
       child: ElevatedButton(
-        onPressed: _saveSettings,
-        style: ElevatedButton.styleFrom(
+            onPressed: _saveSettings,
+            style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+      children: [
             Icon(Icons.save, color: Colors.white, size: 24),
             SizedBox(width: 12),
-            Text(
+        Text(
               'Сохранить настройки',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
               ),
             ),
           ],

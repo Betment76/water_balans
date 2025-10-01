@@ -42,7 +42,7 @@ class _FeatureRow extends StatelessWidget {
             children: [
               Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               const SizedBox(height: 2),
-              Text(subtitle, style: const TextStyle(fontSize: 13, color: Colors.white)),
+              Text(subtitle, style: const TextStyle(fontSize: 13, color: Colors.black87)),
             ],
           ),
         )
@@ -70,14 +70,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   XFile? _avatar;
 
   int _currentPage = 0;
-  int _activityLevel = 3; // 1..5 как в настройках (по умолчанию средний=3)
+  int _activityLevel = 1; // 0..2 (0-низкий, 1-средний, 2-высокий)
   String _selectedUnit = 'мл'; // мл, л, oz
   bool _notificationsEnabled = true;
+  String _gender = 'male'; // пол для онбординга
 
   final List<OnboardingPage> _pages = [
     OnboardingPage(
       title: 'Добро пожаловать в приложение "Водный баланс"!',
-      subtitle: 'Отслеживайте потребление воды и формируйте здоровые привычки',
+      subtitle: 'Поддерживайте оптимальную гидратацию каждый день. Приложение рассчитает вашу персональную норму, подскажет когда пить и поможет закрепить привычку.',
       icon: Icons.water_drop,
       color: Colors.blue,
     ),
@@ -150,7 +151,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final settings = UserSettings(
       weight: weight,
       height: height,
-      activityLevel: _activityLevel,
+      activityLevel: _activityLevel, // 0..2
       dailyNormML: _calculateDailyNorm(weight, _activityLevel),
       isWeatherEnabled: false,
       notificationIntervalHours: 2,
@@ -164,6 +165,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       print(
         '[_completeOnboarding] Настройки пользователя сохранены через провайдер.',
       );
+      // Сохраняем профильные поля для экрана профиля
+      await StorageService.setString('profile_name', _nameController.text.trim());
+      await StorageService.setString('profile_birthdate', _birthDateController.text.trim());
+      await StorageService.setString('profile_gender', _gender);
+      if (_avatar != null) {
+        await StorageService.setString('profile_avatar_path', _avatar!.path);
+      }
     } catch (e) {
       print('[_completeOnboarding] Ошибка при сохранении настроек: $e');
     }
@@ -309,24 +317,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
 
             // Кнопки навигации
-            Container(
-              padding: const EdgeInsets.all(24),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _nextPage,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: Text(
-                        _currentPage == _pages.length - 1 ? 'Начать' : 'Далее',
-                      ),
-                    ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: SizedBox(
+                height: 48,
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _nextPage,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                ],
+                  child: Text(_currentPage == _pages.length - 1 ? 'Начать' : 'Далее'),
+                ),
               ),
             ),
           ],
@@ -360,13 +366,45 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             // Подзаголовок
             Text(
               page.subtitle,
-              style: const TextStyle(fontSize: 16, color: Colors.white),
+              style: const TextStyle(fontSize: 16, color: Colors.black87),
               textAlign: TextAlign.center,
             ),
 
             const SizedBox(height: 32),
 
             // Специфичный контент для каждой страницы
+          if (pageIndex == 0) ...[
+            const SizedBox(height: 8),
+            _FeatureRow(
+              icon: Icons.local_drink,
+              title: 'Персональная дневная норма',
+              subtitle: 'Учитываем вес и активность. Норма обновляется автоматически.'
+            ),
+            const SizedBox(height: 10),
+            _FeatureRow(
+              icon: Icons.alarm,
+              title: 'Умные напоминания',
+              subtitle: 'Не пропустите воду: мягкие пуши без навязчивости.'
+            ),
+            const SizedBox(height: 10),
+            _FeatureRow(
+              icon: Icons.emoji_events,
+              title: 'Достижения и уровни',
+              subtitle: 'Получайте XP, открывайте бейджи и держите серию дней.'
+            ),
+            const SizedBox(height: 10),
+            _FeatureRow(
+              icon: Icons.analytics,
+              title: 'Статистика и календарь',
+              subtitle: 'Дневные и почасовые графики, календарь прогресса.'
+            ),
+            const SizedBox(height: 10),
+            _FeatureRow(
+              icon: Icons.health_and_safety,
+              title: 'Здоровая привычка',
+              subtitle: 'Правильный водный баланс улучшает концентрацию и самочувствие.'
+            ),
+          ],
             if (pageIndex == 1) _buildUserInfoForm(),
             if (pageIndex == 2) _buildNotificationsForm(),
           ],
@@ -378,132 +416,127 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget _buildUserInfoForm() {
     return Column(
       children: [
-        // Аватар
-        GestureDetector(
-          onTap: _pickAvatar,
-          child: CircleAvatar(
-            radius: 48,
-            backgroundColor: Colors.blue.shade100,
-            backgroundImage: _avatar != null ? FileImage(File(_avatar!.path)) : null,
-            child: _avatar == null
-                ? const Icon(Icons.camera_alt, color: Colors.blue, size: 28)
-                : null,
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Имя
-        TextField(
-          controller: _nameController,
-          decoration: const InputDecoration(
-            labelText: 'Имя',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.person),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Дата рождения: ввод ДД.ММ.ГГГГ + возраст справа
-        TextField(
-          controller: _birthDateController,
-          keyboardType: TextInputType.number,
-          onChanged: _onBirthDateChanged,
-          inputFormatters: [
-            _DateDigitsOnlyFormatter(), // только цифры + автоточки
-          ],
-          maxLength: 10,
-          decoration: InputDecoration(
-            counterText: '',
-            labelText: 'Дата рождения (ДД.ММ.ГГГГ)',
-            border: const OutlineInputBorder(),
-            prefixIcon: const Icon(Icons.cake),
-            suffixIcon: Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Center(
-                widthFactor: 1,
-                child: Text(
-                  _birthDate != null ? '${_calculateAge(_birthDate!)} лет' : '—',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-          ),
-          style: const TextStyle(color: Colors.black),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Вес и рост в одной строке
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _weightController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Вес (кг)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.monitor_weight),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _heightController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Рост (см)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.height),
-                ),
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 24),
-
-        // Уровень активности (как в настройках)
-        const Text('Уровень активности:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.blue.shade200),
-          ),
+        _obCard(
+          dense: true,
           child: Column(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Низкий', style: TextStyle(fontSize: 11, color: Colors.white70)),
-                  Text('Уровень $_activityLevel', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  const Text('Высокий', style: TextStyle(fontSize: 11, color: Colors.white70)),
-                ],
+              GestureDetector(
+                onTap: _pickAvatar,
+                child: CircleAvatar(
+                  radius: 40, // компактнее, чтобы уместить всё на экране
+                  backgroundColor: Colors.white,
+                  backgroundImage: _avatar != null ? FileImage(File(_avatar!.path)) : null,
+                  child: _avatar == null ? const Icon(Icons.camera_alt, color: Color(0xFF1976D2)) : null,
+                ),
               ),
-              Slider(
-                value: _activityLevel.toDouble(),
-                min: 1,
-                max: 5,
-                divisions: 4,
-                activeColor: Colors.blue,
-                onChanged: (value) {
-                  setState(() {
-                    _activityLevel = value.round().clamp(1, 5);
-                  });
-                },
+              const SizedBox(height: 8),
+              _obTextField(controller: _nameController, label: 'Имя', icon: Icons.person),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        _obCard(
+          dense: true,
+          child: Column(
+            children: [
+              TextField(
+                controller: _birthDateController,
+                keyboardType: TextInputType.number,
+                onChanged: _onBirthDateChanged,
+                inputFormatters: [ _DateDigitsOnlyFormatter() ],
+                maxLength: 10,
+                decoration: InputDecoration(
+                  counterText: '',
+                  labelText: 'Дата рождения (ДД.ММ.ГГГГ)',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.cake),
+                  suffixIcon: Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Center(
+                      widthFactor: 1,
+                      child: Text(
+                        _birthDate != null ? '${_calculateAge(_birthDate!)} лет' : '—',
+                        style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ),
+                style: const TextStyle(color: Colors.black),
+              ),
+              const SizedBox(height: 6),
+              Row(children: [
+                const Text('Пол:', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(width: 12),
+                ChoiceChip(label: const Text('Мужской'), selected: _gender == 'male', onSelected: (_) => setState(() => _gender = 'male')),
+                const SizedBox(width: 8),
+                ChoiceChip(label: const Text('Женский'), selected: _gender == 'female', onSelected: (_) => setState(() => _gender = 'female')),
+              ]),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        _obCard(
+          dense: true,
+          child: Row(children: [
+            Expanded(child: _obTextField(controller: _weightController, label: 'Вес (кг)', icon: Icons.monitor_weight, numeric: true)),
+            const SizedBox(width: 12),
+            Expanded(child: _obTextField(controller: _heightController, label: 'Рост (см)', icon: Icons.height, numeric: true)),
+          ]),
+        ),
+        const SizedBox(height: 8),
+        _obCard(
+          dense: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Уровень активности', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Низкий'),
+                      selected: _activityLevel == 0,
+                      selectedColor: Colors.blue,
+                      labelStyle: TextStyle(color: _activityLevel == 0 ? Colors.white : Colors.black87),
+                      onSelected: (_) => setState(() => _activityLevel = 0),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      backgroundColor: Colors.grey.shade200,
+                      showCheckmark: false,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Средний'),
+                      selected: _activityLevel == 1,
+                      selectedColor: Colors.blue,
+                      labelStyle: TextStyle(color: _activityLevel == 1 ? Colors.white : Colors.black87),
+                      onSelected: (_) => setState(() => _activityLevel = 1),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      backgroundColor: Colors.grey.shade200,
+                      showCheckmark: false,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Высокий'),
+                      selected: _activityLevel == 2,
+                      selectedColor: Colors.blue,
+                      labelStyle: TextStyle(color: _activityLevel == 2 ? Colors.white : Colors.black87),
+                      onSelected: (_) => setState(() => _activityLevel = 2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      backgroundColor: Colors.grey.shade200,
+                      showCheckmark: false,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-
-        const SizedBox(height: 24),
-
       ],
     );
   }
@@ -544,6 +577,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  // Карточка в стиле профиля/настроек для онбординга
+  Widget _obCard({required Widget child, bool dense = false}) {
+    return Container(
+      padding: EdgeInsets.all(dense ? 8 : 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 6))],
+      ),
+      child: child,
+    );
+  }
+
+  // Унифицированный текстфилд
+  Widget _obTextField({required TextEditingController controller, required String label, required IconData icon, bool numeric = false}) {
+    return TextField(
+      controller: controller,
+      keyboardType: numeric ? TextInputType.number : TextInputType.text,
+      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder(), prefixIcon: Icon(icon)),
+      style: const TextStyle(color: Colors.black),
     );
   }
 }

@@ -81,13 +81,24 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
         foregroundColor: kWhite,
         elevation: 0,
       ),
-      // 📌 Фиксированная кнопка сохранения снизу
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _saveSettings, // сохраняем настройки
-        backgroundColor: kBlue,
-        icon: const Icon(Icons.save, color: kWhite),
-        label: const Text('Сохранить', style: TextStyle(color: kWhite)),
+      // 📌 Полноширинная кнопка сохранения, как на других экранах
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: SizedBox(
+          height: 48,
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _saveSettings,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kBlue,
+              foregroundColor: kWhite,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            icon: const Icon(Icons.save),
+            label: const Text('Сохранить'),
+          ),
+        ),
       ),
       body: Container(
         decoration: const BoxDecoration(

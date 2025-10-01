@@ -554,7 +554,13 @@ class _Aquarium extends StatelessWidget {
             ),
 
             // Bubbles
-            BubblesWidget(waterHeight: waterHeight),
+            ExcludeSemantics(
+              // отключаем семантику для анимированного слоя пузырьков
+              child: RepaintBoundary(
+                // изолируем перерисовки, чтобы не трогать соседние элементы
+                child: BubblesWidget(waterHeight: waterHeight),
+              ),
+            ),
 
             // Fish
             if (waterIntake >= 300)
