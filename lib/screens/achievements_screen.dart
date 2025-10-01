@@ -302,10 +302,14 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: achievement.color.withOpacity(0.2),
+                      color: achievement.color.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(15),
                     ),
-                    child: Icon(achievement.icon, color: achievement.color, size: 24),
+                    child: Icon(
+                      achievement.icon,
+                      color: Color.alphaBlend(Colors.black.withOpacity(0.35), achievement.color),
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: 15),
                   

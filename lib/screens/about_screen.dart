@@ -18,6 +18,27 @@ class _AboutScreenState extends State<AboutScreen> {
     super.initState();
   }
 
+  // 💖 Ссылка для благодарности разработчику (из проекта «давление old»)
+  Future<void> _openDonationLink() async {
+    const String url = 'https://www.tinkoff.ru/rm/r_XmppOJNjFO.yoPWSfGBtK/eBNQr22909';
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось открыть ссылку'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка при открытии ссылки: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -187,6 +208,13 @@ class _AboutScreenState extends State<AboutScreen> {
               () => _launchEmail(
                 subject: 'Предложение для приложения Водный баланс',
               ),
+            ),
+            const SizedBox(height: 8),
+            _buildContactRow(
+              Icons.favorite,
+              'Отблагодарить разработчика',
+              'Перейти к поддержке',
+              _openDonationLink,
             ),
           ],
         ),

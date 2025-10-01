@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'calendar_stats_screen.dart';
 import 'achievements_screen.dart';
-import 'reminders_screen.dart';
 import 'about_screen.dart';
 import 'settings_screen.dart';
 import '../services/mytarget_ad_service.dart';
@@ -27,7 +26,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const HomeScreen(),
     const CalendarStatsScreen(),
     const AchievementsScreen(),
-    const RemindersScreen(),
     const SettingsScreen(),
     const AboutScreen(),
   ];
@@ -68,19 +66,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               onTap: () => setState(() => _currentIndex = 2),
             ),
             _NavIcon(
-              icon: Icons.notifications,
+              icon: Icons.settings,
               selected: _currentIndex == 3,
               onTap: () => setState(() => _currentIndex = 3),
             ),
             _NavIcon(
-              icon: Icons.settings,
+              icon: Icons.info_outline,
               selected: _currentIndex == 4,
               onTap: () => setState(() => _currentIndex = 4),
-            ),
-            _NavIcon(
-              icon: Icons.info_outline,
-              selected: _currentIndex == 5,
-              onTap: () => setState(() => _currentIndex = 5),
             ),
           ],
         ),

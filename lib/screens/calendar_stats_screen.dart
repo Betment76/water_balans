@@ -24,6 +24,41 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
   List<WaterIntake> _dayIntakes = [];
   Map<DateTime, int> _monthlyData = {};
   bool _isLoading = false;
+  
+  // ❄️ Зима?
+  bool _isWinterMonth(int month) => month == 12 || month == 1 || month == 2;
+
+  // 🌈 Градиент фона по сезонам (зима/весна/лето/осень)
+  LinearGradient _seasonGradientForMonth(int month) {
+    // зима: сине-белый; весна: оранжево-белый; лето: красно-белый; осень: жёлто-белый
+    if (month == 12 || month == 1 || month == 2) {
+      return const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF1976D2), Colors.white],
+      );
+    } else if (month >= 3 && month <= 5) {
+      // весна — темнее (глубокий оранжевый → белый)
+      return const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFFB8C00), Color(0xFFFFF3E0)],
+      );
+    } else if (month >= 6 && month <= 8) {
+      return const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFE53935), Colors.white], // красный
+      );
+    } else {
+      // осень — темнее (насыщенный жёлтый → тёплый белый)
+      return const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFFBC02D), Color(0xFFFFF8E1)],
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -124,9 +159,9 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
             // 🗓️ КАЛЕНДАРЬ (верхняя часть)
             Container(
               margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.only(top: 12, left: 20, right: 20, bottom: 20), // 🔼 Уменьшил отступ сверху в контейнере
+            padding: const EdgeInsets.only(top: 4, left: 20, right: 20, bottom: 20), // Поднял строку дней недели ближе к заголовку
               decoration: BoxDecoration(
-                color: Colors.white,
+                gradient: _seasonGradientForMonth(_focusedDate.month), // сезонный градиент
                 borderRadius: BorderRadius.circular(25),
                 boxShadow: [
                   BoxShadow(
@@ -150,9 +185,9 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
                   cellMargin: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 0),
                   cellPadding: const EdgeInsets.all(0),
                   rowDecoration: const BoxDecoration(),
-                  weekendTextStyle: const TextStyle(color: kBlue, fontSize: 14),
+                  weekendTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
                   holidayTextStyle: const TextStyle(color: Colors.red, fontSize: 14),
-                  defaultTextStyle: const TextStyle(fontSize: 14),
+                  defaultTextStyle: const TextStyle(fontSize: 14, color: Colors.white),
                   selectedDecoration: BoxDecoration(
                     color: kBlue,
                     borderRadius: BorderRadius.circular(6),
@@ -170,18 +205,14 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
                 headerStyle: const HeaderStyle(
                   formatButtonVisible: false,
                   titleCentered: true,
-                  headerPadding: EdgeInsets.only(top: 0, bottom: 2), // 🔼 Убрал отступ сверху от месяца
-                  headerMargin: EdgeInsets.only(top: 0, bottom: 2), // 🔼 Поднял месяц ещё выше
-                  titleTextStyle: TextStyle(
-                    color: kBlue,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  headerPadding: EdgeInsets.only(top: 0, bottom: 0),
+                  headerMargin: EdgeInsets.only(top: 0, bottom: 0),
+                  titleTextStyle: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-
+                
                 daysOfWeekStyle: const DaysOfWeekStyle(
-                  weekdayStyle: TextStyle(color: kBlue, fontWeight: FontWeight.w600, fontSize: 12),
-                  weekendStyle: TextStyle(color: kBlue, fontWeight: FontWeight.w600, fontSize: 12),
+                  weekdayStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
+                  weekendStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
                   decoration: BoxDecoration(),
                 ),
 
@@ -192,6 +223,7 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
                     final dayKey = DateTime(day.year, day.month, day.day);
                     final amount = _monthlyData[dayKey] ?? 0;
                     final color = _getDayColor(day, dailyGoal);
+                    // Даты — чёрные цифры всегда
                     
                     return Container(
                       height: 26,
@@ -206,7 +238,7 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
                             Text(
                               '${day.day}',
                               style: TextStyle(
-                                color: amount > 0 ? kBlue : Colors.grey.shade600,
+                                color: Colors.black87,
                                 fontWeight: amount > 0 ? FontWeight.bold : FontWeight.normal,
                                 fontSize: 13,
                               ),
@@ -269,6 +301,7 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
                     final dayKey = DateTime(day.year, day.month, day.day);
                     final amount = _monthlyData[dayKey] ?? 0;
                     final color = _getDayColor(day, dailyGoal);
+                    // Даты — чёрные цифры всегда
                     
                     return Container(
                       height: 28,
@@ -284,7 +317,7 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
                             Text(
                               '${day.day}',
                               style: const TextStyle(
-                                color: kBlue,
+                                color: Colors.black87,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
                               ),
@@ -400,7 +433,8 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
     }
 
     String statusText = '';
-    Color statusColor = kBlue;
+    // 🎨 Стиль как у достижения "Первый глоток" — синий акцент
+    Color statusColor = Colors.blue.shade300;
     IconData statusIcon = Icons.water_drop;
     
     if (totalDay >= dailyGoal) {
@@ -409,15 +443,12 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
       statusIcon = Icons.check_circle;
     } else if (totalDay >= dailyGoal * 0.75) {
       statusText = '💪 Хорошие результаты!';
-      statusColor = kBlue;
       statusIcon = Icons.trending_up;
     } else if (totalDay >= dailyGoal * 0.5) {
       statusText = '📈 Половина пути пройдена!';
-      statusColor = kBlue; // 🔵 Изменил с оранжевого на синий
       statusIcon = Icons.water_drop;
     } else {
       statusText = '💧 Продолжайте!';
-      statusColor = kBlue;
       statusIcon = Icons.water_drop;
     }
 
@@ -425,13 +456,19 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        // 🌊 Градиент как у карточки "Первый глоток"
+        gradient: LinearGradient(
+          colors: [statusColor.withOpacity(0.25), Colors.white],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: statusColor, width: 2),
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: statusColor.withOpacity(0.2),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -440,22 +477,32 @@ class _CalendarStatsScreenState extends ConsumerState<CalendarStatsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.calendar_today, color: statusColor, size: 24),
-              const SizedBox(width: 12),
-              Text(dateText, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kBlue)),
+              Text(
+                dateText,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF0D47A1), // темно-синий
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           
-          Text('$totalDay мл из $dailyGoal мл (${(percentage * 100).toInt()}%)', 
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: statusColor)),
+          Text(
+            '$totalDay мл из $dailyGoal мл (${(percentage * 100).toInt()}%)',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
+          ),
           
           const SizedBox(height: 16),
           Row(
             children: [
-              Icon(statusIcon, color: statusColor, size: 20),
+              Icon(statusIcon, color: const Color(0xFF0D47A1), size: 20),
               const SizedBox(width: 8),
-              Text(statusText, style: TextStyle(fontSize: 16, color: statusColor, fontWeight: FontWeight.w600)),
+              Text(
+                statusText,
+                style: const TextStyle(fontSize: 16, color: Color(0xFF0D47A1), fontWeight: FontWeight.w600),
+              ),
             ],
           ),
         ],
