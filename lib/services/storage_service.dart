@@ -30,6 +30,43 @@ class StorageService {
     return prefs.getString(key);
   }
 
+  /// 📤 Экспорт всех данных из SharedPreferences в JSON-строку
+  static Future<String> exportAllToJson() async {
+    final prefs = await SharedPreferences.getInstance();
+    final Map<String, dynamic> dump = {};
+    for (final key in prefs.getKeys()) {
+      final value = prefs.get(key);
+      if (value == null) continue;
+      dump[key] = value;
+    }
+    return jsonEncode(dump);
+  }
+
+  /// 📥 Импорт всех данных из JSON-строки в SharedPreferences
+  static Future<void> importAllFromJson(String json) async {
+    final prefs = await SharedPreferences.getInstance();
+    final Map<String, dynamic> data = jsonDecode(json);
+    // Сброс кэша истории воды, чтобы избежать рассинхрона
+    _cachedWaterIntakes = null;
+    _cacheTime = null;
+    for (final entry in data.entries) {
+      final k = entry.key;
+      final v = entry.value;
+      if (v is String) {
+        await prefs.setString(k, v);
+      } else if (v is int) {
+        await prefs.setInt(k, v);
+      } else if (v is double) {
+        await prefs.setDouble(k, v);
+      } else if (v is bool) {
+        await prefs.setBool(k, v);
+      } else {
+        // Для списков/сложных структур сохраняем как JSON-строку
+        await prefs.setString(k, jsonEncode(v));
+      }
+    }
+  }
+
   /// Сохранить настройки пользователя
   static Future<void> saveUserSettings(UserSettings settings) async {
     final prefs = await SharedPreferences.getInstance();

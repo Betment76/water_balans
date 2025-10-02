@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io'; // фото из профиля
 import '../services/storage_service.dart';
 import '../models/user_settings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,9 @@ import 'package:geolocator/geolocator.dart';
 import '../services/notification_service.dart';
 import 'package:package_info_plus/package_info_plus.dart'; // версия приложения
 import 'package:url_launcher/url_launcher.dart'; // обратная связь
+import 'package:file_picker/file_picker.dart'; // выбор файла
+import 'package:permission_handler/permission_handler.dart'; // разрешения
+import 'package:path_provider/path_provider.dart'; // запасной путь
 import 'profile_settings_screen.dart'; // экран профиля
 // удалили общий экран
 import 'reminders_screen.dart'; // экран напоминаний
@@ -19,6 +23,7 @@ import '../services/rustore_pay_service.dart';
 // import '../services/test_rustore_billing.dart'; // Удалено для релиза
 import '../constants/app_colors.dart';
 import 'main_navigation_screen.dart';
+import '../services/backup_service.dart';
 
 /// Экран настроек пользователя
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -45,6 +50,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _weatherError;
   String _version = ''; // версия
   String _lastSyncText = '—'; // последняя синхронизация
+  String _profileName = 'Мой профиль'; // имя из профиля
+  String _profileAgeText = '—'; // возраст из профиля
+  File? _profileAvatar; // фото профиля
 
   @override
   void initState() {
@@ -118,8 +126,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         }
       });
     }
-    // 🏷️ Читаем время последнего сохранения
-    StorageService.getString('lastSettingsSaved').then((ts) {
+    // 🧑‍💼 Загружаем профиль: имя/дата рождения/аватар
+    () async {
+      final name = await StorageService.getString('profile_name');
+      final birthStr = await StorageService.getString('profile_birthdate');
+      final avatarPath = await StorageService.getString('profile_avatar_path');
+      DateTime? birth;
+      if (birthStr != null) {
+        birth = DateTime.tryParse(birthStr) ?? _tryParseRuDate(birthStr);
+      }
+      if (mounted) {
+        setState(() {
+          _profileName = (name != null && name.trim().isNotEmpty) ? name.trim() : 'Мой профиль';
+          _profileAgeText = birth != null ? '${_age(birth)} лет' : '—';
+          _profileAvatar = (avatarPath != null && File(avatarPath).existsSync()) ? File(avatarPath) : null;
+        });
+      }
+    }();
+
+    // 🏷️ Читаем время последнего бэкапа
+    StorageService.getString('cloud_last_sync').then((ts) {
       if (!mounted) return;
       setState(() {
         _lastSyncText = ts != null
@@ -133,6 +159,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       setState(() => _version = '${p.version}+${p.buildNumber}');
     });
   }
+  // Возраст (в годах)
+  int _age(DateTime birth) {
+    final now = DateTime.now();
+    var a = now.year - birth.year;
+    if (now.month < birth.month || (now.month == birth.month && now.day < birth.day)) a--;
+    return a;
+  }
+
+  // Парсим ДД.ММ.ГГГГ
+  DateTime? _tryParseRuDate(String value) {
+    final m = RegExp(r'^(\d{2})\.(\d{2})\.(\d{4})$').firstMatch(value);
+    if (m == null) return null;
+    try {
+      final d = int.parse(m.group(1)!);
+      final mo = int.parse(m.group(2)!);
+      final y = int.parse(m.group(3)!);
+      return DateTime(y, mo, d);
+    } catch (_) {
+      return null;
+    }
+  }
+
 
   Future<void> _checkProStatus() async {
     final isPro = await StorageService.isProUser();
@@ -230,6 +278,86 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Настройки сохранены')));
+  }
+
+  /// 💾 Сохранить бэкап локально (SharedPreferences)
+  Future<void> _performBackup() async {
+    try {
+      final json = await StorageService.exportAllToJson();
+      await StorageService.setString('cloud_backup_json', json);
+      final now = DateTime.now().toIso8601String();
+      await StorageService.setString('cloud_last_sync', now);
+      if (mounted) {
+        setState(() {
+          _lastSyncText = _formatRelative(DateTime.tryParse(now));
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Бэкап сохранён локально')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка бэкапа: $e')));
+      }
+    }
+  }
+
+  /// ♻️ Восстановить из выбранного JSON файла
+  Future<void> _performRestore() async {
+    try {
+      final path = await BackupService().restoreFromBackupFile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(path == null ? 'Восстановление отменено' : 'Данные восстановлены из: ${path.split('/').last}')),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка восстановления: $e')));
+      }
+    }
+  }
+
+  /// 💾 Сохранение бэкапа в выбранный пользователем файл (перезапись последнего)
+  Future<void> _performBackupToFile() async {
+    try {
+      final path = await BackupService().createBackupToFile();
+      if (!mounted || path == null) return;
+      setState(() { _lastSyncText = _formatRelative(DateTime.now()); });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Сохранено: ${path.split('/').last}')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка сохранения: $e')));
+      }
+    }
+  }
+
+  /// 📂 Диалог выбора места сохранения (пока локально)
+  void _showBackupDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(
+                title: Text('Куда сохранить бэкап'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.save_alt, color: Color(0xFF1976D2)),
+                title: const Text('Сохранить в файл (Документы)'),
+                subtitle: const Text('JSON резервная копия'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _performBackupToFile();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _resetData() async {
@@ -522,24 +650,59 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0,6))],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-          const CircleAvatar(radius: 28, backgroundColor: Color(0xFFE3F2FD), child: Icon(Icons.person, color: Color(0xFF1976D2))), // аватар
-          const SizedBox(width: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: const Color(0xFFE3F2FD),
+                backgroundImage: _profileAvatar != null ? FileImage(_profileAvatar!) : null,
+                child: _profileAvatar == null ? const Icon(Icons.person, color: Color(0xFF1976D2)) : null,
+              ),
+              const SizedBox(width: 16),
                   Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Мой профиль', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)), // имя/заголовок
-                const SizedBox(height: 4),
-                Text('Посл. синхр.: $_lastSyncText', style: TextStyle(color: Colors.grey.shade600)), // синхронизация
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: _saveSettings, // быстрая синхронизация (сохраняем настройки)
-            icon: const Icon(Icons.sync, color: Color(0xFF1976D2)),
-            tooltip: 'Синхронизировать',
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _profileAgeText == '—' ? _profileName : '$_profileName, $_profileAgeText',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _showBackupDialog, // сохранить бэкап
+                      icon: const Icon(Icons.sync, color: Color(0xFF1976D2)),
+                      tooltip: 'Сохранить бэкап',
+                    ),
+                  ],
+                    ),
+                  ),
+                ],
+              ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              ElevatedButton(
+                onPressed: _performRestore,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1976D2),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                ),
+                child: const Text('Восстановить'),
+              ),
+              const Spacer(),
+              Text(
+                _lastSyncText,
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ],
           ),
         ],
       ),
@@ -555,7 +718,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0,6))],
       ),
       child: Column(
-        children: [
+                children: [
           ListTile(
             leading: const CircleAvatar(backgroundColor: Color(0xFFE3F2FD), child: Icon(Icons.emoji_emotions, color: Color(0xFF1976D2))),
             title: const Text('Мой Профиль', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -729,10 +892,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
               Text('Персонализируй свой опыт', 
                 style: TextStyle(color: Colors.white70, fontSize: 14)),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
     );
   }
 
@@ -759,7 +922,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+            children: [
           // Заголовок с градиентом
           Container(
             width: double.infinity,
@@ -772,7 +935,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             child: Row(
-              children: [
+                children: [
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -905,9 +1068,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               color: Colors.black.withOpacity(0.06),
               blurRadius: 10,
               offset: const Offset(0, 6),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -1003,7 +1166,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// 🌤️ Секция погоды
   Widget _buildWeatherSection() {
     return Column(
-      children: [
+            children: [
         if (_isLoadingWeather)
           const Row(
             children: [

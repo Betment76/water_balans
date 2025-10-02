@@ -52,6 +52,8 @@ dependencies:
   flutter_timezone: ^4.1.1
   image_picker: ^1.1.2
   permission_handler: ^11.3.1
+  file_picker: ^8.0.6
+  path_provider: ^2.1.3
   flutter_rustore_review: ^7.0.0 # RuStore SDK для отзывов и рейтингов
   flutter_rustore_pay: ^10.0.0 # RuStore Pay SDK рабочая версия из проекта давление
   table_calendar: ^3.1.2 # Календарь для экрана статистики
